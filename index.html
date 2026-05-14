@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FaceLab Beauty｜顔から、私をもっと美しく。</title>
+<link rel="stylesheet" href="style.css?v=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;900&family=Zen+Maru+Gothic:wght@400;500;700;900&family=Great+Vibes&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ============ 花びらの装飾背景 ============ -->
+<div class="petal-bg" aria-hidden="true">
+  <div class="petal p1"></div>
+  <div class="petal p2"></div>
+  <div class="petal p3"></div>
+  <div class="petal p4"></div>
+  <div class="petal p5"></div>
+  <div class="petal p6"></div>
+</div>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+      <g>
+        <ellipse cx="24" cy="14" rx="6" ry="9" fill="#FFB7C5" transform="rotate(0 24 24)"/>
+        <ellipse cx="32" cy="20" rx="6" ry="9" fill="#FFC9D6" transform="rotate(72 32 20)"/>
+        <ellipse cx="30" cy="30" rx="6" ry="9" fill="#FFB7C5" transform="rotate(144 30 30)"/>
+        <ellipse cx="18" cy="30" rx="6" ry="9" fill="#FFC9D6" transform="rotate(216 18 30)"/>
+        <ellipse cx="16" cy="20" rx="6" ry="9" fill="#FFB7C5" transform="rotate(288 16 20)"/>
+        <circle cx="24" cy="22" r="3" fill="#FFD93D"/>
+      </g>
+    </svg>
+    <div class="brand-text">
+      <span class="brand-name">FaceLab</span>
+      <span class="brand-script">Beauty.</span>
+      <div class="brand-sub">顔から、私をもっと美しく。</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="nav-pill">v1.0 / Beauty Face Analyzer</span>
+  </div>
+</header>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <div class="hero-eyebrow">
+        <svg viewBox="0 0 16 16" width="14" height="14"><path d="M8 1 L9.5 5.5 L14 5.5 L10.5 8.5 L12 13 L8 10 L4 13 L5.5 8.5 L2 5.5 L6.5 5.5 Z" fill="#FFD93D"/></svg>
+        美しさは表情筋からはじまる
+      </div>
+      <h1>
+        顔の表情筋を整えて、<br/>
+        あなたの<em>魅力</em>が輝き出す。
+      </h1>
+      <p class="hero-lead">
+        468点の顔ランドマークをAIが解析し、あなたの"今"を可視化。<br/>
+        30日間のトレーニングで未来のキレイをデザインしましょう。
+      </p>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-circle"></div>
+      <div class="hero-photo" role="img" aria-label="美しい表情の女性">
+        <svg class="hero-face" viewBox="0 0 240 280" aria-hidden="true">
+          <defs>
+            <linearGradient id="faceGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFE5EC"/>
+              <stop offset="100%" stop-color="#FFC9D6"/>
+            </linearGradient>
+            <linearGradient id="hairGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#3D2A2F"/>
+              <stop offset="100%" stop-color="#5B3F47"/>
+            </linearGradient>
+          </defs>
+          <!-- 髪(後ろ) -->
+          <path d="M40 110 C40 50 90 24 120 24 C150 24 200 50 200 110 L200 200 L180 220 L160 220 L160 180 L80 180 L80 220 L60 220 L40 200 Z" fill="url(#hairGrad)"/>
+          <!-- 顔 -->
+          <ellipse cx="120" cy="140" rx="58" ry="74" fill="url(#faceGrad)"/>
+          <!-- 髪(前髪) -->
+          <path d="M62 100 C70 70 100 56 120 56 C140 56 170 70 178 100 C158 92 140 88 120 88 C100 88 82 92 62 100 Z" fill="url(#hairGrad)"/>
+          <!-- 眉 -->
+          <path d="M82 122 Q92 116 102 122" stroke="#3D2A2F" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M138 122 Q148 116 158 122" stroke="#3D2A2F" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- 目(閉じ気味の穏やかな表情) -->
+          <path d="M82 138 Q92 144 102 138" stroke="#3D2A2F" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path d="M138 138 Q148 144 158 138" stroke="#3D2A2F" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <!-- まつげアクセント -->
+          <line x1="83" y1="140" x2="80" y2="146" stroke="#3D2A2F" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="157" y1="140" x2="160" y2="146" stroke="#3D2A2F" stroke-width="1.5" stroke-linecap="round"/>
+          <!-- 鼻 -->
+          <path d="M118 152 Q116 168 120 174 Q124 168 122 152" stroke="#E07A8A" stroke-width="1.2" fill="none" opacity="0.5"/>
+          <!-- 頬チーク -->
+          <ellipse cx="82" cy="160" rx="10" ry="7" fill="#FFB7C5" opacity="0.6"/>
+          <ellipse cx="158" cy="160" rx="10" ry="7" fill="#FFB7C5" opacity="0.6"/>
+          <!-- 口(微笑) -->
+          <path d="M105 188 Q120 198 135 188" stroke="#E07A8A" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+          <!-- イヤリング -->
+          <circle cx="58" cy="160" r="3.5" fill="#FFD93D"/>
+          <circle cx="182" cy="160" r="3.5" fill="#FFD93D"/>
+          <!-- きらめき -->
+          <g opacity="0.85">
+            <path d="M196 70 L199 78 L207 81 L199 84 L196 92 L193 84 L185 81 L193 78 Z" fill="#FFD93D"/>
+            <path d="M50 220 L52 226 L58 228 L52 230 L50 236 L48 230 L42 228 L48 226 Z" fill="#FFD93D"/>
+          </g>
+        </svg>
+      </div>
+      <div class="hero-script">Your face, Your beauty.</div>
+    </div>
+  </div>
+
+  <!-- 統計 -->
+  <div class="hero-stats">
+    <div>
+      <div class="stat-ico">
+        <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="#E07A8A" stroke-width="1.8"/><circle cx="12" cy="14" r="1.5" fill="#E07A8A"/><circle cx="20" cy="14" r="1.5" fill="#E07A8A"/><path d="M11 20 Q16 23 21 20" stroke="#E07A8A" stroke-width="1.5" fill="none"/></svg>
+      </div>
+      <div class="stat-text"><strong>468</strong><span>顔ランドマーク</span></div>
+    </div>
+    <div>
+      <div class="stat-ico">
+        <svg viewBox="0 0 32 32"><path d="M6 22 Q16 8 26 22 Z" fill="#FFB7C5"/><path d="M6 22 L26 22" stroke="#E07A8A" stroke-width="1.5"/><circle cx="16" cy="22" r="2" fill="#FFD93D"/></svg>
+      </div>
+      <div class="stat-text"><strong>8</strong><span>診断指標</span></div>
+    </div>
+    <div>
+      <div class="stat-ico">
+        <svg viewBox="0 0 32 32"><path d="M16 27 C8 22 4 16 4 12 C4 8 7 5 11 5 C13 5 15 6 16 8 C17 6 19 5 21 5 C25 5 28 8 28 12 C28 16 24 22 16 27 Z" fill="#FFB7C5"/></svg>
+      </div>
+      <div class="stat-text"><strong>25+</strong><span>表情筋トレ</span></div>
+    </div>
+    <div>
+      <div class="stat-ico">
+        <svg viewBox="0 0 32 32"><rect x="5" y="8" width="22" height="20" rx="2" fill="none" stroke="#E07A8A" stroke-width="1.8"/><line x1="5" y1="13" x2="27" y2="13" stroke="#E07A8A" stroke-width="1.8"/><line x1="11" y1="5" x2="11" y2="11" stroke="#E07A8A" stroke-width="1.8" stroke-linecap="round"/><line x1="21" y1="5" x2="21" y2="11" stroke="#E07A8A" stroke-width="1.8" stroke-linecap="round"/><circle cx="11" cy="19" r="1.5" fill="#FFB7C5"/><circle cx="16" cy="19" r="1.5" fill="#FFD93D"/><circle cx="21" cy="19" r="1.5" fill="#FFB7C5"/></svg>
+      </div>
+      <div class="stat-text"><strong>30</strong><span>日間プログラム</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ UPLOAD ============ -->
+<section class="upload-section" id="upload-section">
+  <div class="upload-main card">
+    <div class="card-head">
+      <div class="card-num">STEP<br/>01</div>
+      <div>
+        <h2>顔写真をアップロードして診断 <span class="head-deco">♡</span></h2>
+        <p class="muted">正面写真1枚で、顔の表情筋バランスを詳しく分析します。</p>
+      </div>
+    </div>
+
+    <div class="upload-grid">
+      <div class="upload-slot" id="slot-face">
+        <input type="file" id="file-face" accept="image/*" class="visually-hidden" />
+        <label for="file-face" class="upload-drop" data-target="file-face">
+          <div class="drop-illust">
+            <svg viewBox="0 0 80 110" aria-hidden="true">
+              <ellipse cx="40" cy="55" rx="22" ry="30" fill="none" stroke="#FFB7C5" stroke-width="1.5"/>
+              <circle cx="33" cy="48" r="2" fill="#FFB7C5"/>
+              <circle cx="47" cy="48" r="2" fill="#FFB7C5"/>
+              <path d="M32 68 Q40 73 48 68" stroke="#FFB7C5" stroke-width="1.5" fill="none"/>
+              <path d="M28 38 Q32 35 36 38 M44 38 Q48 35 52 38" stroke="#FFB7C5" stroke-width="1.5" fill="none"/>
+              <line x1="40" y1="38" x2="40" y2="85" stroke="#FFB7C5" stroke-width="1" stroke-dasharray="2 2"/>
+            </svg>
+          </div>
+          <div class="drop-title-row">
+            <span class="drop-title">正面の顔写真</span>
+            <span class="drop-required">必須</span>
+          </div>
+          <div class="upload-icon-circle">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 16V6 M6 12l6-6 6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="drop-sub">JPG / PNG　メガネ・前髪なしの正面・自然光がベスト</div>
+        </label>
+        <div class="preview" id="preview-face" hidden>
+          <canvas id="canvas-face"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SYMPTOMS / CONCERNS ===== -->
+    <div class="symptom-block">
+      <div class="symptom-head">
+        <h3>気になる顔のお悩み <span class="head-deco">🌷</span></h3>
+        <p class="muted">該当するものを選択してください。顔解析と組み合わせて、あなた専用のトレーニングを設計します。</p>
+      </div>
+      <div class="symptom-chips" id="symptom-chips">
+        <label class="chip"><input type="checkbox" value="asymEye"><span>目の左右差</span></label>
+        <label class="chip"><input type="checkbox" value="asymMouth"><span>口角の左右差</span></label>
+        <label class="chip"><input type="checkbox" value="asymBrow"><span>眉の高さの左右差</span></label>
+        <label class="chip"><input type="checkbox" value="sagJaw"><span>フェイスラインのたるみ</span></label>
+        <label class="chip"><input type="checkbox" value="doubleChin"><span>二重あご</span></label>
+        <label class="chip"><input type="checkbox" value="sagCheek"><span>頬のたるみ</span></label>
+        <label class="chip"><input type="checkbox" value="nasolabial"><span>ほうれい線</span></label>
+        <label class="chip"><input type="checkbox" value="mouthDown"><span>口角下がり</span></label>
+        <label class="chip"><input type="checkbox" value="eyeBag"><span>目の下のたるみ・くま</span></label>
+        <label class="chip"><input type="checkbox" value="puffyMorning"><span>朝のむくみ</span></label>
+        <label class="chip"><input type="checkbox" value="roundFace"><span>丸顔・小顔になりたい</span></label>
+        <label class="chip"><input type="checkbox" value="smallEye"><span>目を大きく見せたい</span></label>
+        <label class="chip"><input type="checkbox" value="bruxism"><span>食いしばり・噛み癖</span></label>
+        <label class="chip"><input type="checkbox" value="flatCheek"><span>頬がコケて見える</span></label>
+      </div>
+      <div class="symptom-note">
+        <label for="symptom-free">その他のお悩み（任意）</label>
+        <textarea id="symptom-free" rows="2" placeholder="例：左の口角だけ上がりにくい／写真で右半分が大きく見える など"></textarea>
+      </div>
+    </div>
+
+    <div class="upload-tips">
+      <div class="tip">
+        <div class="tip-ico">📷</div>
+        <div><strong>撮影のポイント</strong>カメラから50cm前後・正面</div>
+      </div>
+      <div class="tip">
+        <div class="tip-ico">💡</div>
+        <div><strong>明るさのポイント</strong>影が出にくい自然光で</div>
+      </div>
+      <div class="tip">
+        <div class="tip-ico">😐</div>
+        <div><strong>表情のポイント</strong>力を抜いた自然な無表情</div>
+      </div>
+      <div class="tip">
+        <div class="tip-ico">👓</div>
+        <div><strong>写りのポイント</strong>メガネ・前髪は外して</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" id="btn-analyze" disabled>
+        <span class="btn-label">顔を解析する</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" class="btn-arrow"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="loader" id="loader" hidden>
+        <div class="loader-spin"></div>
+        <span id="loader-text">モデルを初期化しています…</span>
+      </div>
+    </div>
+  </div>
+
+  <aside class="upload-aside">
+    <div class="aside-card">
+      <h3>
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2 L14 8 L20 9 L15 13 L17 19 L12 16 L7 19 L9 13 L4 9 L10 8 Z" fill="#FFB7C5"/></svg>
+        このツールでわかること
+      </h3>
+      <ul class="aside-list">
+        <li>顔の左右非対称・歪みの傾向</li>
+        <li>たるみ・むくみ・口角下がりの度合い</li>
+        <li>パーツバランス(三庭五眼/黄金比)</li>
+        <li>30日間の表情筋トレーニング</li>
+      </ul>
+    </div>
+
+    <div class="aside-card cta-card">
+      <div class="cta-text">
+        <div class="cta-title">今日からはじめる、<br/>"私史上いちばんの顔"へ。</div>
+        <div class="cta-sub">表情筋を整えて、輝く印象を。</div>
+        <div class="cta-script">Let's Start!</div>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<main id="results" hidden>
+
+  <!-- ===== SUMMARY ===== -->
+  <section class="card">
+    <div class="card-head">
+      <div class="card-num">STEP<br/>02</div>
+      <div>
+        <h2>あなたの顔サマリー <span class="head-deco">✨</span></h2>
+        <p class="muted">AIによる解析結果からスコアと顔タイプを表示します</p>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="score-wrap">
+        <div class="score-ring" id="score-ring">
+          <svg viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#FFE5EC" stroke-width="10"/>
+            <circle cx="60" cy="60" r="52" fill="none" stroke="url(#gscore)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" id="score-arc" transform="rotate(-90 60 60)"/>
+            <defs>
+              <linearGradient id="gscore" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#FF8FA8"/>
+                <stop offset="100%" stop-color="#FFC9D6"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="score-num"><span id="score-value">--</span><small>/100</small></div>
+        </div>
+        <div class="score-label">
+          <div class="score-grade" id="score-grade">--</div>
+          <div class="score-desc" id="score-desc">解析中…</div>
+        </div>
+      </div>
+
+      <div class="type-card">
+        <div class="type-eyebrow">あなたの顔タイプ</div>
+        <div class="type-name" id="face-type">--</div>
+        <div class="type-desc" id="face-type-desc">--</div>
+        <div class="type-tags" id="face-type-tags"></div>
+      </div>
+
+      <div class="metrics" id="metrics-list"></div>
+    </div>
+
+    <div class="overlay-grid">
+      <div class="overlay-pane">
+        <div class="pane-title">顔解析オーバーレイ</div>
+        <canvas id="overlay-face"></canvas>
+        <div class="legend">
+          <span><i style="background:#FF8FA8"></i>中心軸</span>
+          <span><i style="background:#A8D8B9"></i>水平基準</span>
+          <span><i style="background:#FFC966"></i>左右差</span>
+          <span><i style="background:#FFB7C5"></i>ほうれい線</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PROBLEMS ===== -->
+  <section class="card">
+    <div class="card-head">
+      <div class="card-num">STEP<br/>03</div>
+      <div>
+        <h2>気になる顔のポイント <span class="head-deco">💗</span></h2>
+        <p class="muted">顔解析＋お悩みの両方から、ゆるめたい筋肉と鍛えたい筋肉を表示します</p>
+      </div>
+    </div>
+    <div id="symptom-summary" class="symptom-summary" hidden></div>
+    <div class="problems-list" id="problems-list"></div>
+  </section>
+
+  <!-- ===== KNOWLEDGE ===== -->
+  <section class="card knowledge-card">
+    <div class="card-head">
+      <div class="card-num">STEP<br/>04</div>
+      <div>
+        <h2>顔の豆知識 <span class="head-deco">🌸</span></h2>
+        <p class="muted">あなたの顔を理解するための、知っておきたい知識</p>
+      </div>
+    </div>
+    <div class="knowledge-grid" id="knowledge-grid"></div>
+  </section>
+
+  <!-- ===== TODAY ===== -->
+  <section class="card today-card">
+    <div class="card-head">
+      <div class="card-num">STEP<br/>05</div>
+      <div>
+        <h2>今日のあなた専用メニュー <span class="head-deco">🎀</span></h2>
+        <p class="muted">表情筋トレーニング4種目（約5〜10分）</p>
+      </div>
+    </div>
+    <div class="today-grid" id="today-grid"></div>
+  </section>
+
+  <!-- ===== 30 DAYS ===== -->
+  <section class="card program-card">
+    <div class="card-head">
+      <div class="card-num">STEP<br/>06</div>
+      <div>
+        <h2>30日間 美顔トレーニングプログラム <span class="head-deco">👑</span></h2>
+        <p class="muted">Phase 1: 覚醒（Day1-10）／ Phase 2: 強化（Day11-20）／ Phase 3: 定着（Day21-30）</p>
+      </div>
+    </div>
+    <div class="phase-tabs" id="phase-tabs">
+      <button class="phase-tab active" data-phase="1">Phase 1<small>覚醒 Day1-10</small></button>
+      <button class="phase-tab" data-phase="2">Phase 2<small>強化 Day11-20</small></button>
+      <button class="phase-tab" data-phase="3">Phase 3<small>定着 Day21-30</small></button>
+    </div>
+    <div class="program-grid" id="program-grid"></div>
+
+    <div class="actions" style="justify-content:flex-end; margin-top:24px;">
+      <button class="btn-ghost" id="btn-print">🖨️ プログラムを印刷</button>
+      <button class="btn-primary" id="btn-restart">
+        <span class="btn-label">もう一度解析する</span>
+      </button>
+    </div>
+  </section>
+</main>
+
+<!-- ============ MODAL ============ -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel">
+    <button class="modal-close" data-close aria-label="閉じる">×</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="foot-row">© 2026 FaceLab Beauty. All rights reserved.</div>
+  <div class="foot-links">
+    <span>プライバシーポリシー</span>
+    <i>|</i>
+    <span>利用規約</span>
+    <i>|</i>
+    <span>免責事項</span>
+  </div>
+  <div class="foot-disc">
+    本ツールは教育・セルフケア目的の参考情報を提供するものであり、医師・美容医療従事者による診断・治療を代替するものではありません。アップロードされた画像はブラウザ内のみで処理され、外部送信は行いません。
+  </div>
+</footer>
+
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
