@@ -1,8 +1,19 @@
 // ===================================================================
 // FACE KNOWLEDGE CARDS
 // 問題キー → 知っておきたい知識(豆知識)カード群
-// 16カテゴリ × 平均3枚 + 共通 = 50+ カード
+// 16カテゴリ × 平均3枚 + 共通 + NG行動 + 栄養/自律神経
 // ===================================================================
+
+// --- 解剖図SVG library (Phase 1-4) ---
+const ANATOMY_SVG = {
+  zygomaticus: `<svg viewBox="0 0 200 220" class="anatomy-svg" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="115" rx="65" ry="90" fill="#FFE3D5" stroke="#E2A98C" stroke-width="1.5"/><circle cx="78" cy="95" r="3" fill="#333"/><circle cx="122" cy="95" r="3" fill="#333"/><ellipse cx="100" cy="148" rx="14" ry="5" fill="none" stroke="#9B4B5C" stroke-width="1.5"/><path d="M70 78 Q85 115, 90 145" stroke="#FF4D7A" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M130 78 Q115 115, 110 145" stroke="#FF4D7A" stroke-width="3.5" fill="none" stroke-linecap="round"/><text x="100" y="205" text-anchor="middle" font-size="11" fill="#FF4D7A" font-weight="700">大頬骨筋 (Zygomaticus)</text></svg>`,
+  masseter: `<svg viewBox="0 0 200 220" class="anatomy-svg" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="115" rx="65" ry="90" fill="#FFE3D5" stroke="#E2A98C" stroke-width="1.5"/><circle cx="78" cy="95" r="3" fill="#333"/><circle cx="122" cy="95" r="3" fill="#333"/><ellipse cx="100" cy="148" rx="12" ry="4" fill="none" stroke="#9B4B5C" stroke-width="1.5"/><ellipse cx="55" cy="135" rx="11" ry="24" fill="#FF4D7A" opacity=".7" transform="rotate(-12 55 135)"/><ellipse cx="145" cy="135" rx="11" ry="24" fill="#FF4D7A" opacity=".7" transform="rotate(12 145 135)"/><text x="100" y="205" text-anchor="middle" font-size="11" fill="#FF4D7A" font-weight="700">咬筋 (Masseter)</text></svg>`,
+  orbicularisOculi: `<svg viewBox="0 0 200 220" class="anatomy-svg" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="115" rx="65" ry="90" fill="#FFE3D5" stroke="#E2A98C" stroke-width="1.5"/><ellipse cx="78" cy="95" rx="16" ry="12" fill="none" stroke="#FF4D7A" stroke-width="3"/><ellipse cx="122" cy="95" rx="16" ry="12" fill="none" stroke="#FF4D7A" stroke-width="3"/><circle cx="78" cy="95" r="3" fill="#333"/><circle cx="122" cy="95" r="3" fill="#333"/><ellipse cx="100" cy="148" rx="12" ry="4" fill="none" stroke="#9B4B5C" stroke-width="1.5"/><text x="100" y="205" text-anchor="middle" font-size="11" fill="#FF4D7A" font-weight="700">眼輪筋 (Orbicularis oculi)</text></svg>`,
+  orbicularisOris: `<svg viewBox="0 0 200 220" class="anatomy-svg" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="115" rx="65" ry="90" fill="#FFE3D5" stroke="#E2A98C" stroke-width="1.5"/><circle cx="78" cy="95" r="3" fill="#333"/><circle cx="122" cy="95" r="3" fill="#333"/><ellipse cx="100" cy="148" rx="20" ry="10" fill="none" stroke="#FF4D7A" stroke-width="3.5"/><text x="100" y="205" text-anchor="middle" font-size="11" fill="#FF4D7A" font-weight="700">口輪筋 (Orbicularis oris)</text></svg>`,
+  platysma: `<svg viewBox="0 0 200 220" class="anatomy-svg" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="95" rx="55" ry="72" fill="#FFE3D5" stroke="#E2A98C" stroke-width="1.5"/><circle cx="82" cy="80" r="2.5" fill="#333"/><circle cx="118" cy="80" r="2.5" fill="#333"/><ellipse cx="100" cy="125" rx="10" ry="3" fill="none" stroke="#9B4B5C" stroke-width="1.3"/><path d="M48 162 L72 215 L128 215 L152 162 Z" fill="#FF4D7A" opacity=".65"/><text x="100" y="200" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">広頚筋 (Platysma)</text></svg>`,
+  modiolus: `<svg viewBox="0 0 200 220" class="anatomy-svg" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="115" rx="65" ry="90" fill="#FFE3D5" stroke="#E2A98C" stroke-width="1.5"/><circle cx="78" cy="95" r="3" fill="#333"/><circle cx="122" cy="95" r="3" fill="#333"/><ellipse cx="100" cy="148" rx="14" ry="5" fill="none" stroke="#9B4B5C" stroke-width="1.5"/><circle cx="84" cy="148" r="6" fill="#FF4D7A"/><circle cx="116" cy="148" r="6" fill="#FF4D7A"/><g stroke="#FF4D7A" stroke-width="1.5"><line x1="84" y1="148" x2="62" y2="120"/><line x1="84" y1="148" x2="70" y2="170"/><line x1="84" y1="148" x2="90" y2="178"/><line x1="116" y1="148" x2="138" y2="120"/><line x1="116" y1="148" x2="130" y2="170"/><line x1="116" y1="148" x2="110" y2="178"/></g><text x="100" y="205" text-anchor="middle" font-size="11" fill="#FF4D7A" font-weight="700">モディオラス (口角結節点)</text></svg>`,
+  frontalis: `<svg viewBox="0 0 200 220" class="anatomy-svg" xmlns="http://www.w3.org/2000/svg"><ellipse cx="100" cy="115" rx="65" ry="90" fill="#FFE3D5" stroke="#E2A98C" stroke-width="1.5"/><path d="M45 55 Q100 30, 155 55 L150 88 Q100 75, 50 88 Z" fill="#FF4D7A" opacity=".65"/><circle cx="78" cy="100" r="3" fill="#333"/><circle cx="122" cy="100" r="3" fill="#333"/><ellipse cx="100" cy="150" rx="12" ry="4" fill="none" stroke="#9B4B5C" stroke-width="1.3"/><text x="100" y="205" text-anchor="middle" font-size="11" fill="#FF4D7A" font-weight="700">前頭筋 (Frontalis)</text></svg>`,
+};
 
 const KNOWLEDGE = {
   // --- 左右非対称 ---
@@ -16,6 +27,7 @@ const KNOWLEDGE = {
       tag: 'メカニズム', emoji: '🦷',
       title: '噛み癖と顔の関係',
       body: 'いつも同じ側で噛むと、咬筋・側頭筋がその側だけ発達し、フェイスラインの太さや高さに左右差が生まれます。意識的に両側で噛むだけで、3週間で印象は変わります。',
+      svg: ANATOMY_SVG.masseter,
     },
     {
       tag: '習慣', emoji: '🛏️',
@@ -30,6 +42,7 @@ const KNOWLEDGE = {
       tag: '筋肉学', emoji: '😌',
       title: '口角下がりは"使わない罪"',
       body: '口角を上げる筋肉(大頬骨筋・口角挙筋)は、意識しないと1日数分しか使われません。一方、下げる筋肉(口角下制筋)は普段の表情で頻繁に使われます。バランスを取るには上げる筋を鍛えるしかありません。',
+      svg: ANATOMY_SVG.zygomaticus,
     },
     {
       tag: '印象', emoji: '✨',
@@ -40,6 +53,7 @@ const KNOWLEDGE = {
       tag: '構造', emoji: '🌟',
       title: 'モディオラスを意識する',
       body: '口角の少し外側にある「モディオラス」は、9つの表情筋が集まる結節点。ここがしっかり上方向に引かれている人は、安静時でも口角が上がって見えます。',
+      svg: ANATOMY_SVG.modiolus,
     },
   ],
 
@@ -68,6 +82,7 @@ const KNOWLEDGE = {
       tag: '輪郭', emoji: '👤',
       title: 'フェイスラインを決める2つの筋',
       body: '広頸筋(首の前)と舌骨上筋群(顎の下)の活動が、フェイスラインのシャープさを決めます。スマホ姿勢で首を前に出している人ほど、これらが衰えやすい。',
+      svg: ANATOMY_SVG.platysma,
     },
     {
       tag: '舌', emoji: '👅',
@@ -196,11 +211,13 @@ const KNOWLEDGE = {
       tag: '解剖', emoji: '👁️',
       title: 'まぶたの重さは前頭筋とのバランス',
       body: '上まぶたを開く眼瞼挙筋と、額の前頭筋・眉を下げる皺眉筋の力関係でまぶたの軽さが決まります。前頭筋の使い方を覚えるとまぶたが軽く見えます。',
+      svg: ANATOMY_SVG.frontalis,
     },
     {
       tag: '印象', emoji: '✨',
       title: '"目力"は瞳より上まぶた',
       body: '目元の印象は瞳サイズより、上まぶたが瞳をどれだけ露出しているかで決まります。眼輪筋上部のトレーニングで瞼裂を広げられます。',
+      svg: ANATOMY_SVG.orbicularisOculi,
     },
     {
       tag: '生活', emoji: '📱',
@@ -313,20 +330,166 @@ const COMMON = [
   },
 ];
 
+// --- NG行動カード (Phase 1-5) ---
+// 「やってはいけない」習慣を do/dont 形式で提示。
+const NG_ACTIONS = [
+  {
+    tag: 'NG行動', emoji: '🚫', kind: 'ng',
+    title: 'ゴリゴリ強マッサージは逆効果',
+    body: '強圧で皮下組織を擦ると、コラーゲン繊維を断裂させてたるみを加速させます。',
+    dont: ['痛みを感じる強さで擦る','金属ローラーで毎日ゴリゴリ','摩擦で肌が赤くなるまで擦る'],
+    do:   ['滑り材(オイル/クリーム)を必ず使う','圧は「気持ちいい」止まり','同じ場所は3往復まで'],
+  },
+  {
+    tag: 'NG行動', emoji: '🚫', kind: 'ng',
+    title: '無意識クセが顔を歪める',
+    body: '日中の何気ない癖が、3ヶ月で顔の左右差を作ります。',
+    dont: ['いつも同じ側で噛む','頬杖を1日10分以上','片側だけで電話を持つ','うつ伏せ/横向き寝固定'],
+    do:   ['左右交互に噛む意識','頬杖は20秒以内で解除','スピーカー通話に切替','仰向け寝に近づける'],
+  },
+  {
+    tag: 'NG行動', emoji: '🚫', kind: 'ng',
+    title: '表情筋トレの落とし穴',
+    body: 'やりすぎ・間違った力みは逆効果。質>量です。',
+    dont: ['毎日同じ部位を限界まで','力みすぎて他の筋を緊張','痛みを我慢して続行','口角だけ過度に上げる'],
+    do:   ['週4〜5日で休息日を入れる','狙った筋以外は脱力','痛み・違和感は即中止','左右バランスを確認'],
+  },
+  {
+    tag: 'NG行動', emoji: '🚫', kind: 'ng',
+    title: '紫外線とブルーライト対策',
+    body: 'たるみ・シミの最大要因は摩擦より「光老化」。',
+    dont: ['曇りの日にUV対策をしない','室内・車内でも無防備','スマホ画面の至近距離注視'],
+    do:   ['SPF30+を毎朝塗布','曇天・室内でも継続','画面距離30cm以上を維持'],
+  },
+  {
+    tag: 'NG行動', emoji: '🚫', kind: 'ng',
+    title: 'シワを増やす表情癖',
+    body: '同じ表情の繰り返しが固定ジワを作ります。',
+    dont: ['集中時に眉間を寄せる','口を尖らせて考える','片眉だけ上げる癖','頬杖+斜め目線'],
+    do:   ['1時間ごとに表情リセット','鏡で安静時表情を確認','左右対称を意識','深呼吸で顔を緩める'],
+  },
+];
+
+// --- 栄養・自律神経カード (Phase 1-6) ---
+const NUTRITION_ANS = [
+  {
+    tag: '栄養', emoji: '🥚', kind: 'nutrition',
+    title: 'タンパク質: 1日体重×1g以上',
+    body: '表情筋は皮膚に付着する随意筋。タンパク質不足の時、体は真っ先に小さな随意筋から削ります。1食20g(卵3個+肉100gなど)を3食×3日で表情の張りが変わります。',
+  },
+  {
+    tag: '栄養', emoji: '💧', kind: 'nutrition',
+    title: 'むくみ三大ミネラル',
+    body: 'カリウム(野菜/海藻)・マグネシウム(豆/ナッツ)・水分1.5L以上。塩分を減らすより、これらを足す方が顔のむくみは早く取れます。',
+  },
+  {
+    tag: '栄養', emoji: '🐟', kind: 'nutrition',
+    title: 'コラーゲン合成のビタミンC+鉄',
+    body: 'タンパク質を肌のハリに変換するにはビタミンC(柑橘・パプリカ)と鉄(赤身肉・あさり)が必要。サプリより食事優先で。',
+  },
+  {
+    tag: '栄養', emoji: '🍵', kind: 'nutrition',
+    title: '糖質"摂りすぎ"の顔への影響',
+    body: '過剰な糖質は糖化反応(AGEs)を起こし、肌の黄ばみ・たるみ・くすみの原因に。白米→雑穀、菓子→ナッツに置き換えるだけで2週間で違いが出ます。',
+  },
+  {
+    tag: '栄養', emoji: '🌿', kind: 'nutrition',
+    title: '朝食を抜くと顔が老ける',
+    body: '夜間〜朝の絶食12時間以上で自食(オートファジー)が進む反面、表情筋の合成も止まります。朝はタンパク質+果物だけでも摂取を。',
+  },
+  {
+    tag: '自律神経', emoji: '🌬', kind: 'ans',
+    title: '浅い呼吸はたるみを加速',
+    body: '胸式呼吸が癖になると、首の補助筋(斜角筋・胸鎖乳突筋)が緊張し、顔のリンパ排出が滞ります。1日3回、4-7-8呼吸(吸う4秒/止める7秒/吐く8秒)を試して。',
+  },
+  {
+    tag: '自律神経', emoji: '🌙', kind: 'ans',
+    title: '副交感神経で美容ホルモン分泌',
+    body: '成長ホルモン・メラトニンは副交感神経優位の深い睡眠時に最大分泌。寝る90分前のスマホoff・湯舟15分・部屋を暗くする、これだけで肌の修復速度は変わります。',
+  },
+  {
+    tag: '自律神経', emoji: '☀️', kind: 'ans',
+    title: '朝日5分で1日が整う',
+    body: '起床後5分以内に朝日を浴びるとセロトニン分泌が始まり、14〜16時間後にメラトニンへ変換され深い眠りに。顔のターンオーバーが整います。',
+  },
+  {
+    tag: '自律神経', emoji: '🧘', kind: 'ans',
+    title: 'ストレスで眉間と口角が下がる',
+    body: '交感神経優位が続くと、皺眉筋・口角下制筋が無意識に緊張。表情の暗さは性格でなく神経の状態です。深呼吸→肩回し→笑顔の順で、神経をリセット。',
+  },
+  {
+    tag: '自律神経', emoji: '🛁', kind: 'ans',
+    title: '入浴温度40°C×15分の意味',
+    body: '40〜41°Cの湯に15分浸かると深部体温が一時的に上がり、その後の急降下で深い眠りに入りやすくなります。シャワーだけでは得られない美容効果です。',
+  },
+];
+
+// 問題キー → NGアクションのおすすめペア
+const NG_BY_PROBLEM = {
+  facialAsymmetry: 1,    // 「無意識クセ」
+  nasolabialFold: 0,     // 「ゴリゴリ強マッサージ」
+  jawSagging: 1,         // 「無意識クセ」
+  eyeBag: 3,             // 「紫外線対策」
+  foreheadWrinkle: 4,    // 「シワを増やす表情癖」
+  glabellarLine: 4,
+  mouthCornerDown: 4,
+  hoodedEye: 2,          // 「表情筋トレの落とし穴」
+  outerEyeDown: 2,
+};
+
+// 問題キー → 栄養/自律神経カードの優先インデックス
+const NUTRI_BY_PROBLEM = {
+  puffinessIdx: [1],         // むくみ三大ミネラル
+  jawSagging: [0, 4],
+  facialAsymmetry: [8],
+  nasolabialFold: [3, 0],
+  eyeBag: [5, 6],
+  foreheadWrinkle: [8],
+  glabellarLine: [8, 5],
+  hoodedEye: [5],
+};
+
 export function getKnowledgeFor(problemKeys){
-  const cards = [];
   const seen = new Set();
+  const pickFirst = (arr, n) => {
+    const out = [];
+    for (const c of arr){
+      if (!c || seen.has(c.title)) continue;
+      seen.add(c.title);
+      out.push(c);
+      if (out.length >= n) break;
+    }
+    return out;
+  };
+
+  // 1) 問題キー → 解剖/メカニズム系を最大6枚
+  const problemCards = [];
+  problemKeys.forEach(k => (KNOWLEDGE[k] || []).forEach(c => problemCards.push(c)));
+  const topProblem = pickFirst(problemCards, 6);
+
+  // 2) NG行動カード — 関連優先 + デフォルト1〜2枚
+  const ngOrder = [];
   problemKeys.forEach(k => {
-    (KNOWLEDGE[k] || []).forEach(c => {
-      const key = c.title;
-      if (seen.has(key)) return;
-      seen.add(key);
-      cards.push(c);
+    const idx = NG_BY_PROBLEM[k];
+    if (idx != null && NG_ACTIONS[idx]) ngOrder.push(NG_ACTIONS[idx]);
+  });
+  // フォールバック
+  NG_ACTIONS.forEach(c => ngOrder.push(c));
+  const ngCards = pickFirst(ngOrder, 2);
+
+  // 3) 栄養・自律神経カード — 関連優先 + デフォルト1〜2枚
+  const nutriOrder = [];
+  problemKeys.forEach(k => {
+    (NUTRI_BY_PROBLEM[k] || []).forEach(idx => {
+      if (NUTRITION_ANS[idx]) nutriOrder.push(NUTRITION_ANS[idx]);
     });
   });
-  // 共通カードを末尾に
-  COMMON.forEach(c => {
-    if (!seen.has(c.title)) cards.push(c);
-  });
-  return cards.slice(0, 8);
+  NUTRITION_ANS.forEach(c => nutriOrder.push(c));
+  const nutriCards = pickFirst(nutriOrder, 2);
+
+  // 4) 共通カード
+  const commonCards = pickFirst(COMMON, 2);
+
+  // 並びは: 解剖→NG→栄養/自律神経→共通 でリズム良く
+  return [...topProblem, ...ngCards, ...nutriCards, ...commonCards].slice(0, 12);
 }

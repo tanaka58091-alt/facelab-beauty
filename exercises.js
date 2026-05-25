@@ -1440,6 +1440,102 @@ export const EXERCISE_META = {
   faceSymmetryDrill:  { zone:'mid',   intensity:'medium', tier:3 },
 };
 
+// ===================================================================
+// 拡張メタ (Phase 1: 警告・時間帯・道具)
+//   tools:     ['none','fingers','pen','mirror'] 必要な道具
+//   timeOfDay: ['morning','evening','any']       推奨時間帯
+//   contra:    ['tmj','skinSensitive','pregnancy','highBp','neckProblem','glaucoma'] 禁忌
+//   warning:   表示用注意文字列
+// ===================================================================
+export const CONTRA_LABEL = {
+  tmj:           '顎関節症・顎の痛み',
+  skinSensitive: '敏感肌・皮膚疾患',
+  pregnancy:     '妊娠中・産後3ヶ月以内',
+  highBp:        '高血圧・心疾患',
+  neckProblem:   '首・頸椎の不調',
+  glaucoma:      '緑内障・眼圧の高い方',
+};
+export const TIME_OF_DAY_LABEL = { morning:'🌅 朝向け', evening:'🌙 夜向け', any:'⏱ いつでも' };
+export const TOOLS_LABEL = { none:'手ぶら', fingers:'指(手)', pen:'ペン', mirror:'鏡' };
+
+export const EXERCISE_META_EXT = {
+  // 顎を大きく動かす系 → 顎関節症は注意
+  jawOpen:          { contra:['tmj'], warning:'顎の音や痛みが出たら中止してください' },
+  jawDropper:       { contra:['tmj'] },
+  jawlineSlide:     { contra:['tmj'] },
+  jawlineCarve:     { contra:['tmj'] },
+  chinSlideControl: { contra:['tmj'] },
+  supraHyoidIso:    { contra:['tmj','neckProblem'] },
+  evenChewing:      { contra:['tmj'] },
+  chewBalance:      { contra:['tmj'] },
+
+  // 指で押す/タップする系 → 敏感肌は注意
+  cheekPress:       { tools:['fingers'], contra:['skinSensitive'], warning:'こすらず、軽く支える程度に' },
+  cheekPinpoint:    { tools:['fingers'], contra:['skinSensitive'] },
+  earSmile:         { tools:['fingers'] },
+  pencilLift:       { tools:['pen'] },
+  masseterRelease:  { tools:['fingers'], contra:['tmj','skinSensitive'], timeOfDay:['evening'], warning:'痛みのない範囲で。強圧禁止' },
+  masseterTap:      { tools:['fingers'], contra:['tmj','skinSensitive'], warning:'指の腹で軽くトントンする程度' },
+  temporalisRelease:{ tools:['fingers'], contra:['skinSensitive'], timeOfDay:['evening'] },
+  innerCheekPush:   { tools:['fingers'] },
+
+  // 首・広頸筋系 → 頸椎注意
+  necklineStretch:  { timeOfDay:['evening'], contra:['neckProblem'], warning:'痛みのない範囲でゆっくり' },
+  platysmaActivation:{ contra:['neckProblem'] },
+  platysmaPlank:    { contra:['neckProblem','tmj','highBp'] },
+  chinTuck:         { contra:['neckProblem'] },
+  postureLink:      { contra:['neckProblem'], timeOfDay:['morning'] },
+
+  // 目元 → 緑内障注意(眼圧を上げる動作)
+  eyeOpener:        { contra:['glaucoma'], timeOfDay:['morning'] },
+  eyeWindowOpen:    { contra:['glaucoma'], timeOfDay:['morning'] },
+  orbicularisLift:  { contra:['glaucoma'], timeOfDay:['evening'] },
+  lowerEyelidLift:  { contra:['glaucoma'] },
+  outerEyeUp:       { contra:['glaucoma'] },
+  winkAlternate:    { contra:['glaucoma'] },
+
+  // 鏡を使う系
+  symmetryMirror:   { tools:['mirror'] },
+  faceSymmetryDrill:{ tools:['mirror'] },
+  micFace:          { tools:['mirror'] },
+  smileGrading:     { tools:['mirror'] },
+  unilateralSmile:  { tools:['mirror'] },
+
+  // 呼吸系 → 妊娠中・高血圧注意
+  breathFace:       { contra:['highBp','pregnancy'], timeOfDay:['evening'], warning:'息止めは無理しないこと' },
+
+  // 朝のシャキッと系
+  fullFaceFlow:     { timeOfDay:['morning'] },
+  smileHold:        { timeOfDay:['morning'] },
+  duchenneFocus:    { timeOfDay:['morning'] },
+  ahIuEoTraining:   { timeOfDay:['morning'] },
+  tongueRotation:   { timeOfDay:['morning'] },
+  expressionPlay:   { timeOfDay:['morning'] },
+
+  // 夜のリラックス系
+  generalMaintain:  { timeOfDay:['any'] },
+  glabellaRelease:  { timeOfDay:['evening'] },
+  foreheadSmooth:   { timeOfDay:['evening'] },
+  mentalisRelief:   { timeOfDay:['evening'] },
+};
+
 export function getMeta(id){
-  return EXERCISE_META[id] || { zone:'mid', intensity:'medium', tier:2 };
+  const base = EXERCISE_META[id] || { zone:'mid', intensity:'medium', tier:2 };
+  const ext  = EXERCISE_META_EXT[id] || {};
+  return {
+    ...base,
+    tools:    ext.tools    || ['none'],
+    timeOfDay:ext.timeOfDay|| ['any'],
+    contra:   ext.contra   || [],
+    warning:  ext.warning  || null,
+  };
+}
+
+// 禁忌ユーザー設定で除外すべきかを判定
+// userContra: ['tmj','skinSensitive',...]
+export function isExerciseAllowed(id, userContra = []){
+  if (!userContra || userContra.length === 0) return true;
+  const m = getMeta(id);
+  if (!m.contra || m.contra.length === 0) return true;
+  return !m.contra.some(c => userContra.includes(c));
 }

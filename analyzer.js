@@ -66,6 +66,174 @@ function faceScale(lms){
   return dist(lEye, rEye);
 }
 
+// === 頭部 Yaw 推定 (Phase 3-14 斜め45度写真対応) ===
+// 鼻先(NOSE_TIP)が両目中点からどれだけ横にズレているかでヨー角を推定。
+// MediaPipe FaceMesh の Z 座標も併用してより安定させる。
+function estimateYaw(lms){
+  const lEye = midpoint(lms[FM.L_EYE_INNER], lms[FM.L_EYE_OUTER]);
+  const rEye = midpoint(lms[FM.R_EYE_INNER], lms[FM.R_EYE_OUTER]);
+  const eyeMid = midpoint(lEye, rEye);
+  const eyeDist = dist(lEye, rEye) || 1;
+  const noseTip = lms[FM.NOSE_TIP];
+  // 鼻先の眼線中点からの相対横ズレ(目間距離で正規化)
+  const offset = (noseTip.x - eyeMid.x) / eyeDist;
+  // 経験則: offset ~= sin(yaw). 1.0 で約 90°。実用的にはオフセット 0.3 で約 17°
+  const yawDeg = Math.asin(Math.max(-1, Math.min(1, offset))) * 180 / Math.PI;
+  return { yawDeg, yawOffset: offset };
+}
+
+// === 表情判定 (Phase 3-13 表情正規化) ===
+// 笑顔検出: 口角が口中央より十分上、口横幅/縦幅比が大、上下唇間がある
+function detectExpression(lms, scale){
+  const mL = lms[FM.MOUTH_L], mR = lms[FM.MOUTH_R];
+  const mT = lms[FM.MOUTH_TOP], mB = lms[FM.MOUTH_BOTTOM];
+  const mouthW = dist(mL, mR);
+  const mouthH = dist(mT, mB);
+  const widthHeightRatio = mouthW / Math.max(1e-6, mouthH);
+  // 口角の引き上げ
+  const cornerLiftL = (midpoint(mT, mB).y - mL.y) / scale; // +で上に引かれている
+  const cornerLiftR = (midpoint(mT, mB).y - mR.y) / scale;
+  const cornerLift = (cornerLiftL + cornerLiftR) / 2;
+  // 上下唇の隙間 (歯が見える=笑顔の可能性)
+  const lipGap = mouthH / scale;
+
+  let kind = 'neutral';
+  let confidence = 0;
+  if (cornerLift > 0.012 && widthHeightRatio > 5){
+    kind = 'smile';
+    confidence = Math.min(1, (cornerLift - 0.012) * 30);
+  } else if (lipGap > 0.06){
+    kind = 'openMouth';
+    confidence = Math.min(1, (lipGap - 0.06) * 8);
+  } else if (cornerLift < -0.005){
+    kind = 'frown';
+    confidence = Math.min(1, (-0.005 - cornerLift) * 30);
+  }
+  return { kind, confidence, cornerLift, widthHeightRatio, lipGap };
+}
+
+// === ピクセルベース分析 (Phase 3-13 照明補正 + Phase 3-15 テクスチャ) ===
+// 画像の特定領域を矩形でサンプリングし、平均輝度・分散を返す。
+function sampleRegion(imageData, cx, cy, halfW, halfH){
+  const { data, width, height } = imageData;
+  const x0 = Math.max(0, Math.floor(cx - halfW));
+  const y0 = Math.max(0, Math.floor(cy - halfH));
+  const x1 = Math.min(width - 1, Math.floor(cx + halfW));
+  const y1 = Math.min(height - 1, Math.floor(cy + halfH));
+  if (x1 <= x0 || y1 <= y0) return null;
+  let sumL = 0, sumL2 = 0, sumR = 0, sumG = 0, sumB = 0, n = 0;
+  for (let y = y0; y <= y1; y++){
+    for (let x = x0; x <= x1; x++){
+      const i = (y * width + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      const L = 0.299*r + 0.587*g + 0.114*b;
+      sumL += L; sumL2 += L*L;
+      sumR += r; sumG += g; sumB += b;
+      n++;
+    }
+  }
+  if (n === 0) return null;
+  const meanL = sumL / n;
+  const varL = (sumL2 / n) - (meanL * meanL);
+  return {
+    n,
+    luminanceMean: meanL,
+    luminanceStd: Math.sqrt(Math.max(0, varL)),
+    rMean: sumR / n, gMean: sumG / n, bMean: sumB / n,
+  };
+}
+
+// 顔の skin 領域のピクセルを束ねて取得 → 照明 + テクスチャ + トーンを返す
+function analyzePixels(image, lms, scale){
+  if (!image) return null;
+  // imageの自然サイズを利用してCanvasに描画
+  const W = image.naturalWidth || image.width;
+  const H = image.naturalHeight || image.height;
+  if (!W || !H) return null;
+  // ランドマークは正規化 (0-1) なのでピクセル座標へ変換
+  const px = (p) => ({ x: p.x * W, y: p.y * H });
+  let canvas, ctx;
+  try {
+    canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(image, 0, 0, W, H);
+  } catch (e) {
+    return null;
+  }
+  let imgData;
+  try { imgData = ctx.getImageData(0, 0, W, H); }
+  catch(e){ return null; }
+
+  // サンプル領域: 左頬、右頬、額、鼻、顎下
+  // 頬: ZYGO と CHEEK の中間
+  const lZ = px(lms[FM.ZYGO_L]), rZ = px(lms[FM.ZYGO_R]);
+  const lC = px(lms[FM.CHEEK_L]), rC = px(lms[FM.CHEEK_R]);
+  const fh = px(lms[FM.FOREHEAD]);
+  const chin = px(lms[FM.CHIN]);
+  const nb = px(lms[FM.NOSE_BRIDGE]);
+  const noseTip = px(lms[FM.NOSE_TIP]);
+  // 顔幅の概算
+  const fw = Math.abs(rC.x - lC.x) || 100;
+  const half = fw * 0.05; // サンプル矩形の半径
+
+  const leftCheek  = sampleRegion(imgData, (lZ.x + lC.x)/2 + half*0.4, (lZ.y + lC.y)/2, half, half);
+  const rightCheek = sampleRegion(imgData, (rZ.x + rC.x)/2 - half*0.4, (rZ.y + rC.y)/2, half, half);
+  // 額: FOREHEAD は眉のすぐ上付近なので、眉間と FOREHEAD の中間に少し上をサンプル
+  const foreheadCx = fh.x;
+  const foreheadCy = fh.y - half * 0.5;
+  const forehead   = sampleRegion(imgData, foreheadCx, foreheadCy, half * 1.2, half * 0.6);
+  const noseRegion = sampleRegion(imgData, noseTip.x, (nb.y + noseTip.y) / 2, half * 0.5, half * 0.8);
+  const chinRegion = sampleRegion(imgData, chin.x, chin.y - half * 0.4, half * 0.8, half * 0.4);
+
+  // 照明: 左右頬の平均輝度比
+  const lumLC = leftCheek?.luminanceMean ?? 0;
+  const lumRC = rightCheek?.luminanceMean ?? 0;
+  const lumMean = (lumLC + lumRC) / 2 || 1;
+  const lightingBalance = Math.abs(lumLC - lumRC) / lumMean; // 0=均一, 0.2 以上で偏り強
+  // 全体明るさ (0-255)
+  const luminanceOverall = (
+    (leftCheek?.luminanceMean ?? 0) +
+    (rightCheek?.luminanceMean ?? 0) +
+    (forehead?.luminanceMean ?? 0)
+  ) / 3;
+
+  // テクスチャ: 各領域のσ(local stddev)。シワが多い領域ほど高い。
+  const textureLC = leftCheek?.luminanceStd ?? 0;
+  const textureRC = rightCheek?.luminanceStd ?? 0;
+  const textureFH = forehead?.luminanceStd ?? 0;
+  // 顔のスケール(輝度的)で正規化
+  const textureNorm = (luminanceOverall + 1);
+  const wrinkleIdx = ((textureLC + textureRC) / 2 + textureFH * 1.2) / textureNorm;
+
+  // トーン均一性: 各領域のRGB平均差の合計
+  const regions = [leftCheek, rightCheek, forehead, noseRegion, chinRegion].filter(Boolean);
+  let toneVarSum = 0; let toneN = 0;
+  if (regions.length >= 2){
+    const meanR = regions.reduce((s,r)=>s+r.rMean,0) / regions.length;
+    const meanG = regions.reduce((s,r)=>s+r.gMean,0) / regions.length;
+    const meanB = regions.reduce((s,r)=>s+r.bMean,0) / regions.length;
+    regions.forEach(r => {
+      toneVarSum += Math.hypot(r.rMean - meanR, r.gMean - meanG, r.bMean - meanB);
+      toneN++;
+    });
+  }
+  const toneUnevenness = toneN ? (toneVarSum / toneN) / 255 : 0;
+  const toneEvenness = Math.max(0, 1 - toneUnevenness * 4);
+
+  return {
+    luminanceOverall,
+    lightingBalance,
+    leftCheekLum: lumLC, rightCheekLum: lumRC,
+    wrinkleIdx,
+    leftCheekTexture: textureLC,
+    rightCheekTexture: textureRC,
+    foreheadTexture: textureFH,
+    toneEvenness,
+    toneUnevenness,
+  };
+}
+
 // ===================================================================
 // 顔分析: lms → metrics
 // ===================================================================
@@ -73,6 +241,32 @@ export function analyzeFace(rawLms, opts={}){
   const norm = normalizeLandmarks(rawLms);
   const lms = norm.landmarks;
   const scale = faceScale(lms);
+
+  // === Phase 3-14: Yaw 推定 ===
+  const yaw = estimateYaw(lms);
+  // === Phase 3-13: 表情判定 ===
+  const expression = detectExpression(lms, scale);
+  // === Phase 3-13/3-15: ピクセル分析 (画像が渡された場合のみ) ===
+  const pixels = opts.image ? analyzePixels(opts.image, rawLms, scale) : null;
+
+  // 警告フラグ
+  const warnings = [];
+  if (Math.abs(yaw.yawDeg) > 12){
+    warnings.push({ kind:'yaw', severity: Math.abs(yaw.yawDeg) > 22 ? 'high':'mid',
+      message:`顔が${Math.abs(yaw.yawDeg).toFixed(0)}°斜めを向いています。可能な限り正面を向いた写真で再撮影すると精度が上がります。` });
+  }
+  if (expression.kind === 'smile' && expression.confidence > 0.4){
+    warnings.push({ kind:'expression', severity:'mid',
+      message:'笑顔の表情が検出されました。安静時の特徴(口角下がり・ほうれい線等)は無表情の写真で正確に判定できます。' });
+  } else if (expression.kind === 'openMouth' && expression.confidence > 0.4){
+    warnings.push({ kind:'expression', severity:'mid',
+      message:'口が開いた表情が検出されました。口を軽く閉じた状態で再撮影してください。' });
+  }
+  if (pixels){
+    if (pixels.luminanceOverall < 70) warnings.push({ kind:'lighting', severity:'high', message:'写真がやや暗めです。明るい場所で再撮影すると精度が上がります。' });
+    else if (pixels.luminanceOverall > 220) warnings.push({ kind:'lighting', severity:'mid', message:'写真がやや明るすぎます。直射光のない柔らかい光で再撮影してください。' });
+    if (pixels.lightingBalance > 0.18) warnings.push({ kind:'lighting', severity:'mid', message:`左右で明るさに偏り(${(pixels.lightingBalance*100).toFixed(0)}%)があります。左右非対称の判定に影響する可能性があります。` });
+  }
 
   // === 1. 左右非対称 ===
   const noseBridge = lms[FM.NOSE_BRIDGE];
@@ -101,7 +295,12 @@ export function analyzeFace(rawLms, opts={}){
   const lipMidY = midpoint(lms[FM.MOUTH_TOP], lms[FM.MOUTH_BOTTOM]).y;
   const lCornerDrop = (mL.y - lipMidY) / scale;
   const rCornerDrop = (mR.y - lipMidY) / scale;
-  const mouthCornerDrop = (lCornerDrop + rCornerDrop) / 2;
+  let mouthCornerDrop = (lCornerDrop + rCornerDrop) / 2;
+  // 笑顔補正: 笑顔の場合、口角が上がるので mouthCornerDrop が過小評価される
+  // 表情の confidence に応じて、安静時推定値を加算
+  if (expression.kind === 'smile' && expression.confidence > 0){
+    mouthCornerDrop += expression.confidence * 0.018;
+  }
 
   // === 3. ほうれい線 ===
   const nasoL = dist(lms[FM.NOSE_L], lms[FM.MOUTH_L]) / scale;
@@ -179,11 +378,52 @@ export function analyzeFace(rawLms, opts={}){
   // 鼻下端→顎先 ÷ 顔幅
   const lowerFaceLength = (chin.y - noseBottomY) / scale;
 
+  // === Phase 3-12: 左右独立スコア (部位別) ===
+  // 各部位の左右別 0-100 スコア。高いほど良好。
+  // 注: 写真の左右と顔の左右は鏡像なので、ここでは画像の左=ユーザーの右(向かって左)として扱う。
+  const sideScores = (() => {
+    // 目: 開眼度 (大きいほど良好)
+    const lEyeOpenScore = clamp01((lEyeH - 0.020) / 0.025) * 100;
+    const rEyeOpenScore = clamp01((rEyeH - 0.020) / 0.025) * 100;
+    // ほうれい線: 距離が大きいほど良好
+    const lNasoScore = clamp01((nasoL - 0.34) / 0.10) * 100;
+    const rNasoScore = clamp01((nasoR - 0.34) / 0.10) * 100;
+    // 口角: 下垂 0 以下が理想
+    const lCornerScore = clamp01(1 - Math.max(0, lCornerDrop) / 0.04) * 100;
+    const rCornerScore = clamp01(1 - Math.max(0, rCornerDrop) / 0.04) * 100;
+    // 眉-まぶた: 大きいほど良好
+    const lBrowLidScore = clamp01((lBrowToLid - 0.10) / 0.10) * 100;
+    const rBrowLidScore = clamp01((rBrowToLid - 0.10) / 0.10) * 100;
+    // 目尻の傾き: 0 が理想
+    const lEyeSlantScore = clamp01(1 - Math.abs(lEyeSlant) / 0.04) * 100;
+    const rEyeSlantScore = clamp01(1 - Math.abs(rEyeSlant) / 0.04) * 100;
+    // フェイスライン(頬下垂): 値が小さいほど良好
+    const lJawScore = clamp01(1 - Math.max(0, lms[FM.CHEEK_L].y - eyeLineY) / scale / 0.62) * 100;
+    const rJawScore = clamp01(1 - Math.max(0, lms[FM.CHEEK_R].y - eyeLineY) / scale / 0.62) * 100;
+    return {
+      left: {
+        eye: lEyeOpenScore, naso: lNasoScore, corner: lCornerScore,
+        browLid: lBrowLidScore, eyeSlant: lEyeSlantScore, jaw: lJawScore,
+        overall: avg([lEyeOpenScore, lNasoScore, lCornerScore, lBrowLidScore, lEyeSlantScore, lJawScore]),
+      },
+      right: {
+        eye: rEyeOpenScore, naso: rNasoScore, corner: rCornerScore,
+        browLid: rBrowLidScore, eyeSlant: rEyeSlantScore, jaw: rJawScore,
+        overall: avg([rEyeOpenScore, rNasoScore, rCornerScore, rBrowLidScore, rEyeSlantScore, rJawScore]),
+      },
+    };
+  })();
+
   return {
     scale,
     landmarksRaw: rawLms,
     landmarksNorm: lms,
     rollDeg: norm.rollDeg,
+    yaw,
+    expression,
+    pixels,
+    warnings,
+    sideScores,
     metrics: {
       // 既存
       midlineTilt, eyeHeightDiff, browHeightDiff, mouthTilt, asymmetryScore,
@@ -193,9 +433,18 @@ export function analyzeFace(rawLms, opts={}){
       // 新規
       mandibleProminence, cheekHollowIdx, philtrumIdx, browLidGap, eyeSlant,
       lowerFaceLength,
+      // Phase 3-15: テクスチャ(画像があれば)
+      wrinkleIdx: pixels?.wrinkleIdx ?? null,
+      toneEvenness: pixels?.toneEvenness ?? null,
+      // Phase 3-14: ヨー
+      yawDeg: yaw.yawDeg,
     },
   };
 }
+
+// ---- helper utils ----
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const avg = (arr) => arr.length ? arr.reduce((s,v)=>s+v,0) / arr.length : 0;
 
 // ===================================================================
 // 年代別の参照範囲(集団基準)
@@ -518,6 +767,18 @@ export function buildMetricsList(result){
     { name:'五眼指数', value:m.fiveEyesIdx.toFixed(2), detail:'顔幅 ÷ 目幅(理想 5.0)', ...sev(Math.abs(m.fiveEyesIdx-5.0),[0.4,0.8]) },
     { name:'三庭バランス', value:m.triPct.map(p=>(p*100).toFixed(0)+'%').join(' / '), detail:'上庭/中庭/下庭(理想 33%/33%/33%)', ...sev(Math.max(Math.abs(m.triPct[0]-0.333),Math.abs(m.triPct[1]-0.333),Math.abs(m.triPct[2]-0.333)),[0.04,0.08]) },
   ];
+  // Phase 3-15: 画像があれば、シワ・トーン指標を追加
+  if (typeof m.wrinkleIdx === 'number'){
+    items.push({ name:'肌テクスチャ指数', value:m.wrinkleIdx.toFixed(3), detail:'頬/額の局所コントラスト(小さいほど滑らか)', ...sev(Math.max(0, m.wrinkleIdx - 0.04), [0.01, 0.025]) });
+  }
+  if (typeof m.toneEvenness === 'number'){
+    const pct = Math.round(m.toneEvenness * 100);
+    items.push({ name:'肌トーン均一度', value:`${pct}%`, detail:'各部位の色差ばらつき(大きいほど均一)', sev: pct >= 75 ? 'good' : pct >= 55 ? 'mid' : 'bad', pct: pct });
+  }
+  // Phase 3-14: ヨーが大きい場合の情報指標
+  if (typeof m.yawDeg === 'number'){
+    items.push({ name:'頭部ヨー', value:`${m.yawDeg.toFixed(1)}°`, detail:'顔の向き(0°が正面)', ...sev(Math.abs(m.yawDeg), [8, 18]) });
+  }
 
   return items.map(it => ({ ...it, pct: Math.max(15, Math.min(100, it.pct)) }));
 }

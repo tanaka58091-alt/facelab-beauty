@@ -12,7 +12,28 @@
 //   ageGroup:     '10s' .. '60s'(中年代以上はlight強度寄り、若年は強度を上げる)
 //   lifestyle:    { sleep, posture, diet, stress } 生活背景タグ(出力理由文に反映)
 // ===================================================================
-import { EXERCISES, EXERCISE_META, PRESCRIPTION_MAP } from './exercises.js';
+import { EXERCISES, EXERCISE_META, PRESCRIPTION_MAP, getMeta, isExerciseAllowed } from './exercises.js';
+
+// === 季節バイアス (Phase 2-9) ===
+// 各季節で特に意識したいゾーン/種目に弱い優先付与
+const SEASON_BIAS = {
+  spring: { focus:'mid',    note:'乾燥緩和とむくみ排出、表情筋の起動に集中' },
+  summer: { focus:'lower',  note:'紫外線後のたるみ予防と冷房むくみ対策' },
+  autumn: { focus:'mid',    note:'夏疲労リセットと血流回復を優先' },
+  winter: { focus:'upper',  note:'乾燥・血流低下対策と眼精疲労ケア' },
+};
+// 季節おすすめ種目 (やんわり優先)
+const SEASON_FAVORITE = {
+  spring: ['cheekPump','platysmaActivation','breathFace','fullFaceFlow','smileHold'],
+  summer: ['platysmaActivation','platysmaPlank','chinTuck','necklineStretch','jawlineSlide'],
+  autumn: ['breathFace','generalMaintain','tongueRotation','smileHold','postureLink'],
+  winter: ['eyeOpener','orbicularisLift','foreheadSmooth','breathFace','smileHold'],
+};
+// 月経・PMS期にはハード強度や息止め系を控えめに
+const LIFESTAGE_AVOID = {
+  menstrual:  ['platysmaPlank','breathFace'],
+  postpartum: ['platysmaPlank'],
+};
 
 const COUNT_BY_TIME = { 3:3, 5:4, 10:5, 15:6 };
 
@@ -89,20 +110,41 @@ const REST_FRIENDLY = [
 const isStretch = (id) => EXERCISES[id]?.kind === 'stretch';
 
 function pickLeastUsed(idList, usage, count, opts){
-  const { anchors, excludeIds=[], maxStretch=1, goal='overall', ageGroup='30s', goalFavorites } = opts;
+  const { anchors, excludeIds=[], maxStretch=1, goal='overall', ageGroup='30s',
+          goalFavorites, contra=[], timeOfDay='any', season=null,
+          seasonFavorites=new Set(), lifeStageAvoid=new Set(), historyBoost={} } = opts;
   const zoneBias = GOAL_ZONE_BIAS[goal] || GOAL_ZONE_BIAS.overall;
+  const seasonBias = season && SEASON_BIAS[season] ? SEASON_BIAS[season] : null;
+
+  // 禁忌種目はそもそも候補から除外
+  idList = idList.filter(id => isExerciseAllowed(id, contra));
 
   const score = (id) => {
     const meta = EXERCISE_META[id] || {};
+    const fullMeta = getMeta(id);
     let s = usage[id] || 0;
     // アンカー: 強い優先
     if (anchors.has(id)) s -= 0.5;
     // ゴール好みのリスト
     if (goalFavorites.has(id)) s -= 0.35;
+    // 季節おすすめ
+    if (seasonFavorites.has(id)) s -= 0.18;
+    // ライフステージ回避 (重いペナルティ、強制除外ではなく劣後)
+    if (lifeStageAvoid.has(id)) s += 0.6;
+    // 履歴ベース: 改善が遅い問題向けの種目に弱い優先
+    if (historyBoost[id]) s -= historyBoost[id];
     // ストレッチには僅かペナルティ
     if (isStretch(id)) s += 0.25;
     // ゾーンバイアス
     s += zoneBias[meta.zone] || 0;
+    // 季節フォーカスゾーンに僅か優先
+    if (seasonBias && meta.zone === seasonBias.focus) s -= 0.08;
+    // 時間帯マッチング (好みと一致なら弱い優先、不一致は弱いペナルティ)
+    const tods = fullMeta.timeOfDay || ['any'];
+    if (timeOfDay !== 'any'){
+      if (tods.includes(timeOfDay)) s -= 0.12;
+      else if (!tods.includes('any')) s += 0.1;
+    }
     // 年代別強度ペナルティ
     s += intensityPenalty(meta.intensity, ageGroup);
     // tier 1 を僅か優先
@@ -158,12 +200,22 @@ export function build30DayProgram(problemKeys, opts={}){
     priorityKeys = [],
     ageGroup = '30s',
     lifestyle = {},
+    contra = [],
+    lifeStage = 'none',
+    timeOfDay = 'any',
+    season = null,
+    history = [],
   } = opts;
 
   const count = COUNT_BY_TIME[timeBudget] || 4;
-  const pool = buildPool(problemKeys);
+  let pool = buildPool(problemKeys);
+  // 禁忌種目は完全除外
+  pool = pool.filter(id => isExerciseAllowed(id, contra));
   const anchors = buildAnchors(problemKeys, priorityKeys);
   const goalFavorites = new Set(GOAL_FAVORITE[goal] || GOAL_FAVORITE.overall);
+  const seasonFavorites = new Set(season ? (SEASON_FAVORITE[season] || []) : []);
+  const lifeStageAvoid = new Set(LIFESTAGE_AVOID[lifeStage] || []);
+  const historyBoost = buildHistoryBoost(history, problemKeys);
   const restPool = pool.filter(id => REST_FRIENDLY.includes(id));
   const usage = Object.fromEntries(pool.map(id => [id, 0]));
 
@@ -185,6 +237,7 @@ export function build30DayProgram(problemKeys, opts={}){
     const training = pickLeastUsed(sourceList, usage, dayCount, {
       anchors, excludeIds: prevIds, maxStretch: 1,
       goal, ageGroup, goalFavorites,
+      contra, timeOfDay, season, seasonFavorites, lifeStageAvoid, historyBoost,
     });
     training.forEach(ex => { usage[ex.id] = (usage[ex.id] || 0) + 1; });
 
@@ -192,14 +245,52 @@ export function build30DayProgram(problemKeys, opts={}){
       day, phase, isRest,
       theme: themeFor(phase, dayInPhase, isRest),
       training,
-      reason: buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget }),
+      reason: buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget, contra, lifeStage, timeOfDay, season, history }),
     });
   }
   return days;
 }
 
+// 履歴 → 改善遅い問題向けの種目ブースト
+function buildHistoryBoost(history, problemKeys){
+  if (!history || history.length < 2) return {};
+  // 最新2スナップを比較し、悪化/停滞している指標に紐づく種目を強化
+  const latest = history[0];
+  const prev   = history[1];
+  if (!latest?.meta?.metrics || !prev?.meta?.metrics) return {};
+  const lm = latest.meta.metrics;
+  const pm = prev.meta.metrics;
+  const boost = {};
+  // 各メトリクスの改善方向 (低いほど良いと仮定)
+  Object.keys(lm).forEach(key => {
+    if (typeof lm[key] !== 'number' || typeof pm[key] !== 'number') return;
+    const delta = lm[key] - pm[key];
+    if (delta >= -0.005) {
+      // 改善が乏しい/悪化 → その問題に紐づくPRESCRIPTION_MAP種目をブースト
+      const probKey = METRIC_TO_PROBLEM[key];
+      if (probKey && PRESCRIPTION_MAP[probKey]) {
+        PRESCRIPTION_MAP[probKey].training.slice(0,3).forEach(id => {
+          boost[id] = (boost[id] || 0) + 0.15;
+        });
+      }
+    }
+  });
+  return boost;
+}
+
+const METRIC_TO_PROBLEM = {
+  midlineTilt: 'facialAsymmetry',
+  eyeHeightDiff: 'facialAsymmetry',
+  browHeightDiff: 'facialAsymmetry',
+  mouthTilt: 'facialAsymmetry',
+  jawSlackRatio: 'jawSagging',
+  mouthCornerDrop: 'mouthCornerDown',
+  nasolabialDepth: 'nasolabialFold',
+  puffinessIdx: 'puffiness',
+};
+
 // 日ごとの「なぜこのメニュー」テキスト生成
-function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget }){
+function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget, contra=[], lifeStage='none', timeOfDay='any', season=null, history=[] }){
   if (isRest){
     return `Day${day}は循環優先のアクティブレスト。${timeBudget}分以内・軽強度のみで構成し、明日からの集中強化に備えます。`;
   }
@@ -219,9 +310,31 @@ function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, life
 
   const lifeNote = lifestyleNote(lifestyle);
   const ageNote = ageGroup ? `${ageGroup.replace('s','代')}の組織変化を考慮し、強度を最適化しています。` : '';
+  const contraNote = (contra && contra.length)
+    ? `既往症「${contra.map(c => CONTRA_LABEL_SHORT[c]||c).join('・')}」に該当する種目は自動で除外しています。`
+    : '';
+  const lifeStageNote = lifeStage === 'pregnancy' ? '妊娠中のため、息止め・うつ伏せ姿勢系は除外。'
+                      : lifeStage === 'postpartum' ? '産後3ヶ月以内のため、強負荷種目を控えめに配列。'
+                      : lifeStage === 'menstrual' ? 'PMS/月経期は軽強度寄りに調整しています。'
+                      : '';
+  const seasonNote = season && SEASON_BIAS[season]
+    ? `${SEASON_LABEL[season]}は${SEASON_BIAS[season].note}。`
+    : '';
+  const todNote = timeOfDay === 'morning' ? '朝向けの覚醒系種目を優先しています。'
+                : timeOfDay === 'evening' ? '夜向けのリリース・脱力系種目を優先しています。'
+                : '';
+  const histNote = (history && history.length >= 2)
+    ? `過去スナップショット${history.length}件と比較し、改善が遅い指標向けの種目を弱く優先しています。`
+    : '';
 
-  return `${phaseLabel}。今日の${training.length}種は、${priorityText}を中心に、過去2日と重複しないよう自動選定。ゴール「${goalLabel}」のゾーンを重点配置。${ageNote}${lifeNote}`;
+  return `${phaseLabel}。今日の${training.length}種は、${priorityText}を中心に、過去2日と重複しないよう自動選定。ゴール「${goalLabel}」のゾーンを重点配置。${ageNote}${lifeNote}${contraNote}${lifeStageNote}${seasonNote}${todNote}${histNote}`;
 }
+
+const CONTRA_LABEL_SHORT = {
+  tmj:'顎関節症', skinSensitive:'敏感肌', pregnancy:'妊娠中',
+  highBp:'高血圧', neckProblem:'首の不調', glaucoma:'緑内障',
+};
+const SEASON_LABEL = { spring:'春', summer:'夏', autumn:'秋', winter:'冬' };
 
 function lifestyleNote(life){
   const notes = [];

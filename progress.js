@@ -55,7 +55,7 @@ export function buildSnapshotMeta({ score, grade, faceType, ageGroup, goal, prob
 }
 function pickKeyMetrics(m){
   if (!m) return {};
-  const keys = ['midlineTilt','eyeHeightDiff','browHeightDiff','mouthTilt','jawSlackRatio','mouthCornerDrop','nasolabialDepth','puffinessIdx'];
+  const keys = ['midlineTilt','eyeHeightDiff','browHeightDiff','mouthTilt','jawSlackRatio','mouthCornerDrop','nasolabialDepth','puffinessIdx','wrinkleIdx','toneEvenness'];
   const out = {};
   keys.forEach(k => { if (k in m) out[k] = round3(m[k]); });
   return out;

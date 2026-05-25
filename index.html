@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FaceLab Beauty｜顔から、私をもっと美しく。</title>
-<link rel="stylesheet" href="style.css?v=4" />
+<link rel="stylesheet" href="style.css?v=5" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;900&family=Zen+Maru+Gothic:wght@400;500;700;900&family=Great+Vibes&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -330,6 +330,36 @@
             <label><input type="radio" name="stress" value="low"><span>低い</span></label>
           </div>
         </div>
+
+        <div class="hear-row hear-row-contra">
+          <div class="hear-label">既往症・体調 <span class="hear-sub">該当のみ複数選択可</span></div>
+          <div class="check-chips" data-name="contra">
+            <label><input type="checkbox" name="contra" value="tmj"><span>顎関節症</span></label>
+            <label><input type="checkbox" name="contra" value="skinSensitive"><span>敏感肌</span></label>
+            <label><input type="checkbox" name="contra" value="neckProblem"><span>首/頸椎の不調</span></label>
+            <label><input type="checkbox" name="contra" value="glaucoma"><span>緑内障</span></label>
+            <label><input type="checkbox" name="contra" value="highBp"><span>高血圧/心疾患</span></label>
+          </div>
+        </div>
+
+        <div class="hear-row">
+          <div class="hear-label">妊娠・産後・月経 <span class="hear-sub">該当する場合のみ</span></div>
+          <div class="radio-chips" data-name="lifeStage">
+            <label><input type="radio" name="lifeStage" value="none" checked><span>該当なし</span></label>
+            <label><input type="radio" name="lifeStage" value="pregnancy"><span>妊娠中</span></label>
+            <label><input type="radio" name="lifeStage" value="postpartum"><span>産後3ヶ月以内</span></label>
+            <label><input type="radio" name="lifeStage" value="menstrual"><span>月経中・PMS期</span></label>
+          </div>
+        </div>
+
+        <div class="hear-row">
+          <div class="hear-label">練習する時間帯</div>
+          <div class="radio-chips" data-name="timeOfDay">
+            <label><input type="radio" name="timeOfDay" value="morning"><span>🌅 主に朝</span></label>
+            <label><input type="radio" name="timeOfDay" value="evening"><span>🌙 主に夜</span></label>
+            <label><input type="radio" name="timeOfDay" value="any" checked><span>⏱ どちらでも</span></label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -431,6 +461,9 @@
 
       <div class="metrics" id="metrics-list"></div>
     </div>
+
+    <div id="analysis-warnings" class="analysis-warnings" hidden></div>
+    <div id="side-scores" class="side-scores" hidden></div>
 
     <div class="overlay-grid">
       <div class="overlay-pane">

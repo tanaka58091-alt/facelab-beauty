@@ -5,7 +5,7 @@ import {
   analyzeFace, detectProblems, determineFaceType,
   calcScore, gradeFromScore, buildMetricsList, FM,
 } from './analyzer.js';
-import { EXERCISES } from './exercises.js';
+import { EXERCISES, getMeta, CONTRA_LABEL, TIME_OF_DAY_LABEL, TOOLS_LABEL } from './exercises.js';
 import { pickTodayMenu, build30DayProgram } from './program.js';
 import { getKnowledgeFor } from './knowledge.js';
 import { buildMotionPlayerHTML, initMotionPlayer } from './motion.js';
@@ -111,7 +111,45 @@ const state = {
     stress: '',         // 'high' | 'mid' | 'low'
   },
   priorityKeys: [],     // ユーザーが選んだ TOP3 のお悩みキー
+  contra: [],           // 既往症 ['tmj','skinSensitive','neckProblem','glaucoma','highBp']
+  lifeStage: 'none',    // 'none' | 'pregnancy' | 'postpartum' | 'menstrual'
+  timeOfDay: 'any',     // 'morning' | 'evening' | 'any' — 練習時間帯の好み
+  season: detectSeason(),
 };
+
+// 月から季節を自動取得
+function detectSeason(){
+  const m = new Date().getMonth() + 1;
+  if (m >= 3 && m <= 5)  return 'spring';
+  if (m >= 6 && m <= 8)  return 'summer';
+  if (m >= 9 && m <= 11) return 'autumn';
+  return 'winter';
+}
+
+const USER_PREFS_KEY = 'facelab.userPrefs.v1';
+function saveUserPrefs(){
+  try {
+    localStorage.setItem(USER_PREFS_KEY, JSON.stringify({
+      ageGroup: state.ageGroup, timeBudget: state.timeBudget, goal: state.goal,
+      lifestyle: state.lifestyle, contra: state.contra,
+      lifeStage: state.lifeStage, timeOfDay: state.timeOfDay,
+    }));
+  } catch {}
+}
+function loadUserPrefs(){
+  try {
+    const raw = localStorage.getItem(USER_PREFS_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (p.ageGroup)  state.ageGroup  = p.ageGroup;
+    if (p.timeBudget) state.timeBudget = p.timeBudget;
+    if (p.goal)      state.goal      = p.goal;
+    if (p.lifestyle) Object.assign(state.lifestyle, p.lifestyle);
+    if (Array.isArray(p.contra)) state.contra = p.contra;
+    if (p.lifeStage) state.lifeStage = p.lifeStage;
+    if (p.timeOfDay) state.timeOfDay = p.timeOfDay;
+  } catch {}
+}
 
 // ===== Symptom → Problem mapping (30 symptoms) =====
 const SYMPTOM_MAP = {
@@ -244,6 +282,22 @@ function collectHearing(){
     const el = document.querySelector(`input[name="${g}"]:checked`);
     if (el) state.lifestyle[g] = el.value;
   });
+  // 既往症 (multi)
+  state.contra = Array.from(document.querySelectorAll('input[name="contra"]:checked')).map(el => el.value);
+  // ライフステージ
+  const lsEl = document.querySelector('input[name="lifeStage"]:checked');
+  if (lsEl) state.lifeStage = lsEl.value;
+  // 妊娠中・産後は自動で禁忌に追加
+  if (state.lifeStage === 'pregnancy' || state.lifeStage === 'postpartum') {
+    if (!state.contra.includes('pregnancy')) state.contra = [...state.contra, 'pregnancy'];
+  }
+  // 時間帯
+  const todEl = document.querySelector('input[name="timeOfDay"]:checked');
+  if (todEl) state.timeOfDay = todEl.value;
+  // 季節は自動再計算
+  state.season = detectSeason();
+  // 永続化
+  saveUserPrefs();
   // 優先度: チップで .is-priority クラスが付いている上位3つ
   state.priorityKeys = [];
   const seen = new Set();
@@ -380,7 +434,9 @@ els.btnAnalyze.addEventListener('click', async () => {
       hideLoader();
       return;
     }
-    state.result = analyzeFace(lms);
+    state.result = analyzeFace(lms, { image: state.imgFace });
+    // 解析警告を表示 (照明・表情・ヨー)
+    surfaceAnalysisWarnings(state.result.warnings || []);
 
     setLoader('問題点を抽出 → 30日プログラムを構築中…');
     collectSymptoms();
@@ -405,6 +461,11 @@ els.btnAnalyze.addEventListener('click', async () => {
       priorityKeys: state.priorityKeys,
       ageGroup: state.ageGroup,
       lifestyle: state.lifestyle,
+      contra: state.contra,
+      lifeStage: state.lifeStage,
+      timeOfDay: state.timeOfDay,
+      season: state.season,
+      history: listSnapshots(),
     });
 
     renderAll();
@@ -446,12 +507,67 @@ function renderAll(){
   renderMetrics();
   renderOverlay();
   renderSymptomSummary();
+  renderSideScores();
   renderProblems();
   renderKnowledge();
   renderToday();
   renderProgramMeta();
   renderProgram(state.currentPhase);
   renderProgress();
+}
+
+// 解析警告のレンダリング (照明・表情・ヨー)
+function surfaceAnalysisWarnings(warnings){
+  const host = document.getElementById('analysis-warnings');
+  if (!host) return;
+  if (!warnings || warnings.length === 0){ host.hidden = true; host.innerHTML = ''; return; }
+  host.hidden = false;
+  host.innerHTML = warnings.map(w => `
+    <div class="analysis-warning ${w.severity || 'mid'}">
+      <span class="aw-ico">${w.kind==='lighting'?'💡':w.kind==='yaw'?'↪':w.kind==='expression'?'😊':'⚠'}</span>
+      <span class="aw-msg">${w.message}</span>
+    </div>
+  `).join('');
+}
+
+// 左右独立スコアのレンダリング (Phase 3-12)
+function renderSideScores(){
+  const host = document.getElementById('side-scores');
+  if (!host) return;
+  const s = state.result?.sideScores;
+  if (!s){ host.hidden = true; host.innerHTML = ''; return; }
+  host.hidden = false;
+  const labels = { eye:'目', naso:'ほうれい線', corner:'口角', browLid:'眉まぶた', eyeSlant:'目尻', jaw:'頬下垂' };
+  const row = (side, data) => {
+    const items = Object.entries(labels).map(([k,lbl]) => {
+      const v = Math.round(data[k]);
+      const cls = v >= 70 ? 'good' : v >= 45 ? 'mid' : 'bad';
+      return `<li class="ss-item ${cls}"><span class="ss-lbl">${lbl}</span><span class="ss-val">${v}</span></li>`;
+    }).join('');
+    const overall = Math.round(data.overall);
+    return `
+      <div class="ss-side">
+        <div class="ss-side-head">
+          <span class="ss-side-name">${side}</span>
+          <span class="ss-side-overall">${overall}</span>
+        </div>
+        <ul class="ss-list">${items}</ul>
+      </div>`;
+  };
+  // 顔の向かって左 = 写真の右、向かって右 = 写真の左 (一般ユーザー向けに見た目で表記)
+  const lr = Math.round(s.left.overall - s.right.overall);
+  const diffNote = Math.abs(lr) >= 8
+    ? `<div class="ss-diff-note">左右差: <strong>${Math.abs(lr)}pt</strong>（${lr>0?'左側':'右側'}がやや高評価）</div>`
+    : `<div class="ss-diff-note">左右差: ${Math.abs(lr)}pt（バランス良好）</div>`;
+  host.innerHTML = `
+    <h3 class="ss-title">📐 左右独立スコア</h3>
+    <p class="ss-sub">部位ごとに左右別の0-100スコア。差が大きいほど非対称が強いことを示します。</p>
+    <div class="ss-grid">
+      ${row('左', s.left)}
+      ${row('右', s.right)}
+    </div>
+    ${diffNote}
+  `;
 }
 
 // ===== Progress (履歴) =====
@@ -568,7 +684,32 @@ if (els.btnClearHistory){
   });
 }
 // 起動時にも履歴表示を更新(結果未表示でも履歴は残るが、UIは hidden 内なので影響なし)
-document.addEventListener('DOMContentLoaded', () => { renderProgress(); });
+document.addEventListener('DOMContentLoaded', () => {
+  loadUserPrefs();
+  // 保存済プリファレンスをフォームに反映
+  applyUserPrefsToForm();
+  renderProgress();
+});
+
+function applyUserPrefsToForm(){
+  const setRadio = (name, val) => {
+    const el = document.querySelector(`input[name="${name}"][value="${val}"]`);
+    if (el) el.checked = true;
+  };
+  setRadio('ageGroup', state.ageGroup);
+  setRadio('timeBudget', String(state.timeBudget));
+  setRadio('goal', state.goal);
+  ['sleep','posture','diet','stress'].forEach(g => {
+    if (state.lifestyle[g]) setRadio(g, state.lifestyle[g]);
+  });
+  setRadio('lifeStage', state.lifeStage);
+  setRadio('timeOfDay', state.timeOfDay);
+  // contra (multi)
+  (state.contra || []).forEach(v => {
+    const el = document.querySelector(`input[name="contra"][value="${v}"]`);
+    if (el) el.checked = true;
+  });
+}
 
 function renderSymptomSummary(){
   const has = state.symptoms.length > 0 || state.symptomFree;
@@ -797,14 +938,30 @@ function problemIllust(key){
 // ===== Knowledge =====
 function renderKnowledge(){
   const cards = getKnowledgeFor(state.problems.map(p => p.key));
-  els.knowledgeGrid.innerHTML = cards.map(c => `
-    <div class="know-card">
-      <span class="know-tag">${c.tag}</span>
-      <div class="know-emoji">${c.emoji}</div>
-      <h3>${c.title}</h3>
-      <p>${c.body}</p>
-    </div>
-  `).join('');
+  els.knowledgeGrid.innerHTML = cards.map(c => {
+    const kindClass = c.kind ? ` know-${c.kind}` : '';
+    const svgBlock = c.svg ? `<div class="know-anatomy">${c.svg}</div>` : '';
+    let actionBlock = '';
+    if (c.kind === 'ng' && (c.dont || c.do)) {
+      const dontList = (c.dont||[]).map(s => `<li>${s}</li>`).join('');
+      const doList   = (c.do||[]).map(s => `<li>${s}</li>`).join('');
+      actionBlock = `
+        <div class="know-action-grid">
+          ${c.dont ? `<div class="know-act dont"><strong>❌ DON'T</strong><ul>${dontList}</ul></div>` : ''}
+          ${c.do   ? `<div class="know-act do"><strong>✅ DO</strong><ul>${doList}</ul></div>` : ''}
+        </div>`;
+    }
+    return `
+      <div class="know-card${kindClass}">
+        <span class="know-tag">${c.tag}</span>
+        <div class="know-emoji">${c.emoji}</div>
+        <h3>${c.title}</h3>
+        <p>${c.body}</p>
+        ${svgBlock}
+        ${actionBlock}
+      </div>
+    `;
+  }).join('');
 }
 
 // ===== Today menu =====
@@ -892,6 +1049,13 @@ els.phaseTabs.addEventListener('click', e => {
 
 // ===== Modal =====
 function openExerciseModal(ex){
+  const meta = getMeta(ex.id);
+  const todChips = (meta.timeOfDay||[]).map(t => `<span class="meta-chip tod">${TIME_OF_DAY_LABEL[t]||t}</span>`).join('');
+  const toolChips = (meta.tools||[]).map(t => `<span class="meta-chip tool">🛠 ${TOOLS_LABEL[t]||t}</span>`).join('');
+  const contraChips = (meta.contra||[]).map(c => `<span class="meta-chip contra">⚠ ${CONTRA_LABEL[c]||c}</span>`).join('');
+  const warningBlock = meta.warning ? `<div class="ex-warning">⚠️ <strong>注意:</strong> ${meta.warning}</div>` : '';
+  const contraBlock = contraChips ? `<div class="ex-contra-row"><span class="ex-contra-label">禁忌:</span>${contraChips}</div>` : '';
+
   els.modalBody.innerHTML = `
     <div class="modal-ex-head">
       <div class="modal-ex-illust">${ex.illustration}</div>
@@ -902,9 +1066,12 @@ function openExerciseModal(ex){
           <span><strong>所要</strong> ${ex.duration}</span>
           <span><strong>道具</strong> ${ex.equipment}</span>
         </div>
+        <div class="ex-meta-chips">${todChips}${toolChips}</div>
         <p style="font-size:13px; color:var(--ink-2); margin:10px 0 0">${ex.purpose}</p>
       </div>
     </div>
+    ${warningBlock}
+    ${contraBlock}
     <div class="modal-section">
       <h4>🎬 動画ガイド (タイマー付き)</h4>
       ${buildMotionPlayerHTML(ex.id)}
