@@ -8,6 +8,11 @@ import {
 import { EXERCISES } from './exercises.js';
 import { pickTodayMenu, build30DayProgram } from './program.js';
 import { getKnowledgeFor } from './knowledge.js';
+import { buildMotionPlayerHTML, initMotionPlayer } from './motion.js';
+import {
+  saveSnapshot, listSnapshots, clearHistory, deleteSnapshot,
+  thumbnailFromCanvas, buildSnapshotMeta,
+} from './progress.js';
 
 const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -45,7 +50,47 @@ const els = {
   symptomChips: $('#symptom-chips'),
   symptomFree: $('#symptom-free'),
   symptomSummary: $('#symptom-summary'),
+  todayReason: $('#today-reason'),
+  programMeta: $('#program-meta'),
+
+  // Progress
+  progressStat: $('#progress-stat'),
+  progressEmpty: $('#progress-empty'),
+  progressTimeline: $('#progress-timeline'),
+  btnCompare: $('#btn-compare'),
+  btnClearHistory: $('#btn-clear-history'),
+  baStage: $('#ba-stage'),
+  baBefore: $('#ba-before'),
+  baAfter: $('#ba-after'),
+  baSlider: $('#ba-slider'),
+  baMeta: $('#ba-meta'),
 };
+
+// 優先チップ: ダブルクリックで is-priority トグル(最大3つ)
+document.addEventListener('DOMContentLoaded', () => {
+  const chipsRoot = document.getElementById('symptom-chips');
+  if (!chipsRoot) return;
+  chipsRoot.addEventListener('dblclick', (e) => {
+    const lbl = e.target.closest('label.chip');
+    if (!lbl) return;
+    const cb = lbl.querySelector('input[type="checkbox"]');
+    if (!cb) return;
+    // 優先化はチェックが入っているもののみ
+    if (!cb.checked) cb.checked = true;
+    if (lbl.classList.contains('is-priority')){
+      lbl.classList.remove('is-priority');
+    } else {
+      const current = chipsRoot.querySelectorAll('label.chip.is-priority').length;
+      if (current >= 3){
+        // 一番古い優先(=最初の要素)を外す
+        const first = chipsRoot.querySelector('label.chip.is-priority');
+        first?.classList.remove('is-priority');
+      }
+      lbl.classList.add('is-priority');
+    }
+    e.preventDefault();
+  });
+});
 
 const state = {
   imgFace: null,
@@ -56,27 +101,88 @@ const state = {
   currentPhase: 1,
   symptoms: [],
   symptomFree: '',
+  ageGroup: '30s',
+  timeBudget: 5,        // 1日あたり目安(分): 3 / 5 / 10 / 15
+  goal: 'overall',      // 'liftup' | 'symmetry' | 'antiAging' | 'shrink' | 'eyes' | 'overall'
+  lifestyle: {          // 生活背景タグ
+    sleep: '',          // 'short' | 'normal' | 'long'
+    posture: '',        // 'smartphone' | 'desk' | 'normal'
+    diet: '',           // 'hardChew' | 'softChew' | 'normal'
+    stress: '',         // 'high' | 'mid' | 'low'
+  },
+  priorityKeys: [],     // ユーザーが選んだ TOP3 のお悩みキー
 };
 
-// ===== Symptom → Problem mapping =====
+// ===== Symptom → Problem mapping (30 symptoms) =====
 const SYMPTOM_MAP = {
-  asymEye:      { label:'目の左右差',           keys:['facialAsymmetry'] },
-  asymMouth:    { label:'口角の左右差',         keys:['facialAsymmetry','mouthCornerDown'] },
-  asymBrow:     { label:'眉の高さの左右差',     keys:['facialAsymmetry'] },
-  sagJaw:       { label:'フェイスラインのたるみ', keys:['jawSagging'] },
-  doubleChin:   { label:'二重あご',             keys:['jawSagging'] },
-  sagCheek:     { label:'頬のたるみ',           keys:['jawSagging','nasolabialFold'] },
-  nasolabial:   { label:'ほうれい線',           keys:['nasolabialFold'] },
-  mouthDown:    { label:'口角下がり',           keys:['mouthCornerDown'] },
-  eyeBag:       { label:'目の下のたるみ・くま', keys:['puffiness'] },
-  puffyMorning: { label:'朝のむくみ',           keys:['puffiness'] },
-  roundFace:    { label:'丸顔・小顔になりたい', keys:['puffiness','jawSagging'] },
-  smallEye:     { label:'目を大きく見せたい',   keys:['puffiness','partsBalance'] },
-  bruxism:      { label:'食いしばり・噛み癖',   keys:['facialAsymmetry','jawSagging'] },
-  flatCheek:    { label:'頬がコケて見える',     keys:['nasolabialFold','partsBalance'] },
+  // 左右差
+  asymEye:      { label:'目の左右差',           keys:['facialAsymmetry'], group:'左右差' },
+  asymMouth:    { label:'口角の左右差',         keys:['facialAsymmetry','mouthCornerDown'], group:'左右差' },
+  asymBrow:     { label:'眉の高さの左右差',     keys:['facialAsymmetry'], group:'左右差' },
+  asymCheek:    { label:'頬の張り方の左右差',   keys:['facialAsymmetry','masseterHypertrophy'], group:'左右差' },
+  // たるみ・輪郭
+  sagJaw:       { label:'フェイスラインのたるみ', keys:['jawSagging'], group:'たるみ・輪郭' },
+  doubleChin:   { label:'二重あご',             keys:['jawSagging'], group:'たるみ・輪郭' },
+  sagCheek:     { label:'頬のたるみ',           keys:['jawSagging','nasolabialFold'], group:'たるみ・輪郭' },
+  marionette:   { label:'マリオネットライン',   keys:['mouthCornerDown','jawSagging'], group:'たるみ・輪郭' },
+  // ほうれい線・口元
+  nasolabial:   { label:'ほうれい線',           keys:['nasolabialFold'], group:'口元' },
+  mouthDown:    { label:'口角下がり',           keys:['mouthCornerDown'], group:'口元' },
+  thinUpperLip: { label:'上唇が薄い・薄くなった', keys:['longPhiltrum','mouthCornerDown'], group:'口元' },
+  longPhiltrum: { label:'人中が長く見える',     keys:['longPhiltrum'], group:'口元' },
+  gummy:        { label:'笑うと歯茎が出る(ガミー)', keys:['gummySmile'], group:'口元' },
+  // むくみ・循環
+  eyeBag:       { label:'目の下のたるみ・くま', keys:['puffiness'], group:'むくみ' },
+  puffyMorning: { label:'朝のむくみ',           keys:['puffiness'], group:'むくみ' },
+  roundFace:    { label:'丸顔・小顔になりたい', keys:['puffiness','jawSagging'], group:'むくみ' },
+  dullSkin:     { label:'顔色がくすむ',         keys:['puffiness'], group:'むくみ' },
+  // 目元
+  smallEye:     { label:'目を大きく見せたい',   keys:['hoodedEyelid','puffiness'], group:'目元' },
+  hoodedEye:    { label:'まぶたが重い・厚い',   keys:['hoodedEyelid'], group:'目元' },
+  droopyEye:    { label:'目尻が下がる',         keys:['droopyEyeOuter'], group:'目元' },
+  oneEyeSmall:  { label:'片目だけ小さい',       keys:['facialAsymmetry','hoodedEyelid'], group:'目元' },
+  // エラ・咬筋
+  bruxism:      { label:'食いしばり・噛み癖',   keys:['masseterHypertrophy','facialAsymmetry'], group:'エラ' },
+  jawAngular:   { label:'エラが張っている',     keys:['masseterHypertrophy'], group:'エラ' },
+  hardCheek:    { label:'頬・側頭部が固い',     keys:['masseterHypertrophy','templeHollow'], group:'エラ' },
+  // 痩せ・凹み
+  flatCheek:    { label:'頬がコケて見える',     keys:['cheekHollow','nasolabialFold'], group:'凹み' },
+  templeHollow: { label:'こめかみが凹む',       keys:['templeHollow'], group:'凹み' },
+  // シワ
+  foreheadWrinkle: { label:'額の横ジワ',         keys:['foreheadLines'], group:'シワ' },
+  glabellarWrinkle:{ label:'眉間のタテジワ',     keys:['glabellarLines'], group:'シワ' },
+  crowsFeet:    { label:'目尻の小ジワ',         keys:['droopyEyeOuter'], group:'シワ' },
+  // バランス
+  partsBalance: { label:'パーツのバランスが気になる', keys:['partsBalance'], group:'印象' },
 };
 
-// 症状から導かれた追加問題のメタ
+// 自由記述 → 問題キー抽出
+const KEYWORD_MAP = [
+  { pat:/エラ|咬筋|噛み[しじ]め|食いしば/, key:'masseterHypertrophy' },
+  { pat:/ガミ|歯[茎ぐき]/, key:'gummySmile' },
+  { pat:/頬[がコこ]+ケ|こけて|頬の凹/, key:'cheekHollow' },
+  { pat:/こめかみ|側頭部の凹/, key:'templeHollow' },
+  { pat:/人中/, key:'longPhiltrum' },
+  { pat:/まぶた|瞼|一重|奥二重/, key:'hoodedEyelid' },
+  { pat:/目尻[がの]?下|たれ目/, key:'droopyEyeOuter' },
+  { pat:/額.*シワ|おでこ.*シワ|前頭.*シワ/, key:'foreheadLines' },
+  { pat:/眉間/, key:'glabellarLines' },
+  { pat:/むくみ|浮腫|腫れ/, key:'puffiness' },
+  { pat:/たるみ|フェイスライン|二重あご|二重顎/, key:'jawSagging' },
+  { pat:/ほうれい|法令線/, key:'nasolabialFold' },
+  { pat:/口角[がの]?下|への字/, key:'mouthCornerDown' },
+  { pat:/左右差|非対称|歪み|ゆがみ/, key:'facialAsymmetry' },
+  { pat:/小顔|顔.{0,3}大き/, key:'puffiness' },
+];
+
+function extractKeysFromText(text){
+  if (!text) return [];
+  const out = new Set();
+  KEYWORD_MAP.forEach(({pat, key}) => { if (pat.test(text)) out.add(key); });
+  return Array.from(out);
+}
+
+// 症状から導かれた追加問題のメタ (16カテゴリ)
 const SYMPTOM_PROBLEM_META = {
   facialAsymmetry: { title:'顔の左右非対称', desc:'お悩みから推定。表情筋の使い方の偏り・噛み癖などが背景にある可能性が高いです。', tissues:{tight:['側頭筋(片側)','咬筋(片側)','広頸筋'], weak:['口角挙筋(反対側)','大頬骨筋(反対側)']} },
   mouthCornerDown: { title:'口角下がり', desc:'お悩みから推定。口角挙筋・大頬骨筋の弱化と、口角下制筋の過緊張が起こりやすい状態です。', tissues:{tight:['口角下制筋','下唇下制筋','広頸筋'], weak:['口角挙筋','大頬骨筋','小頬骨筋']} },
@@ -84,6 +190,15 @@ const SYMPTOM_PROBLEM_META = {
   jawSagging:      { title:'フェイスラインのたるみ', desc:'お悩みから推定。広頸筋・咬筋の過緊張と、舌骨上筋群・首前面の弱化が要因です。', tissues:{tight:['広頸筋','咬筋','胸鎖乳突筋'], weak:['舌骨上筋群','顎二腹筋','頬筋']} },
   puffiness:       { title:'顔のむくみ', desc:'お悩みから推定。リンパの停滞と表情筋の循環不足が背景となります。', tissues:{tight:['咬筋','広頸筋'], weak:['眼輪筋','頬筋','顎二腹筋']} },
   partsBalance:    { title:'パーツバランスのズレ', desc:'お悩みから推定。骨格は変えられませんが、表情筋と姿勢で印象を整えられます。', tissues:{tight:['咬筋','側頭筋'], weak:['前頭筋','眼輪筋','大頬骨筋']} },
+  masseterHypertrophy: { title:'咬筋肥大・エラ張り', desc:'お悩みから推定。食いしばり・片噛みで咬筋が肥大し、輪郭の張りやこめかみ陥凹を引き起こします。', tissues:{tight:['咬筋','側頭筋','広頸筋'], weak:['舌','頬筋','口角挙筋']} },
+  cheekHollow:     { title:'頬コケ・中顔面の痩せ', desc:'お悩みから推定。頬筋・大頬骨筋の萎縮と脂肪減少で中顔面が陥凹して見える状態です。', tissues:{tight:['咬筋','口輪筋'], weak:['頬筋','大頬骨筋','上唇挙筋']} },
+  longPhiltrum:    { title:'人中の伸び・上唇下垂', desc:'お悩みから推定。上唇挙筋・口輪筋上部の弱化、口呼吸習慣で人中が長く見えます。', tissues:{tight:['口輪筋下部','下唇下制筋'], weak:['上唇挙筋','上唇鼻翼挙筋','口輪筋上部']} },
+  gummySmile:      { title:'ガミースマイル', desc:'お悩みから推定。上唇挙筋・小頬骨筋の過剰活動で上唇が引き上がりすぎる状態です。', tissues:{tight:['上唇挙筋','小頬骨筋'], weak:['口輪筋上部','上唇']} },
+  hoodedEyelid:    { title:'まぶたの重さ・厚み', desc:'お悩みから推定。眼瞼挙筋の弱化と前頭筋の代償が起こりやすい状態です。', tissues:{tight:['皺眉筋','眼輪筋外側'], weak:['眼瞼挙筋','前頭筋','眼輪筋上部']} },
+  droopyEyeOuter:  { title:'目尻下がり', desc:'お悩みから推定。眼輪筋外側と側頭筋膜のテンション低下が背景です。', tissues:{tight:['頬骨筋'], weak:['眼輪筋外側','側頭筋膜']} },
+  templeHollow:    { title:'こめかみ陥凹', desc:'お悩みから推定。側頭筋疲労と循環低下で組織が萎縮して見えます。', tissues:{tight:['側頭筋','咬筋'], weak:['前頭筋外側']} },
+  foreheadLines:   { title:'額の横ジワ', desc:'お悩みから推定。前頭筋の使い癖と眼瞼挙筋の代償が原因です。', tissues:{tight:['前頭筋'], weak:['眼瞼挙筋','眼輪筋上部']} },
+  glabellarLines:  { title:'眉間の縦ジワ', desc:'お悩みから推定。皺眉筋・鼻根筋の収縮癖が刻まれた状態です。', tissues:{tight:['皺眉筋','鼻根筋'], weak:['前頭筋中央']} },
 };
 
 function buildSymptomProblemKeys(){
@@ -97,7 +212,52 @@ function buildSymptomProblemKeys(){
       out.push(k);
     });
   });
+  // 自由記述からの抽出
+  extractKeysFromText(state.symptomFree).forEach(k => {
+    if (added.has(k)) return;
+    added.add(k);
+    out.push(k);
+  });
   return out;
+}
+
+// 優先度に基づいて problems を並び替える(priorityKeys → severity → 残り)
+function reorderProblems(problems){
+  const priority = new Set(state.priorityKeys);
+  const sevRank = { high:0, mid:1, low:2 };
+  return problems.slice().sort((a,b) => {
+    const pa = priority.has(a.key) ? 0 : 1;
+    const pb = priority.has(b.key) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    return (sevRank[a.severity] ?? 3) - (sevRank[b.severity] ?? 3);
+  });
+}
+
+function collectHearing(){
+  const ageEl  = document.querySelector('input[name="ageGroup"]:checked');
+  const timeEl = document.querySelector('input[name="timeBudget"]:checked');
+  const goalEl = document.querySelector('input[name="goal"]:checked');
+  if (ageEl)  state.ageGroup  = ageEl.value;
+  if (timeEl) state.timeBudget = +timeEl.value;
+  if (goalEl) state.goal      = goalEl.value;
+  ['sleep','posture','diet','stress'].forEach(g => {
+    const el = document.querySelector(`input[name="${g}"]:checked`);
+    if (el) state.lifestyle[g] = el.value;
+  });
+  // 優先度: チップで .is-priority クラスが付いている上位3つ
+  state.priorityKeys = [];
+  const seen = new Set();
+  document.querySelectorAll('#symptom-chips label.is-priority').forEach(lbl => {
+    const cb = lbl.querySelector('input[type="checkbox"]');
+    if (!cb || !cb.checked) return;
+    const def = SYMPTOM_MAP[cb.value]; if (!def) return;
+    def.keys.forEach(k => {
+      if (seen.has(k)) return;
+      seen.add(k);
+      state.priorityKeys.push(k);
+    });
+  });
+  state.priorityKeys = state.priorityKeys.slice(0, 3);
 }
 function makeSymptomProblem(key){
   const meta = SYMPTOM_PROBLEM_META[key] || SYMPTOM_PROBLEM_META.facialAsymmetry;
@@ -224,9 +384,10 @@ els.btnAnalyze.addEventListener('click', async () => {
 
     setLoader('問題点を抽出 → 30日プログラムを構築中…');
     collectSymptoms();
-    state.problems = detectProblems(state.result);
+    collectHearing();
+    state.problems = detectProblems(state.result, { ageGroup: state.ageGroup });
 
-    // 症状ベースで補完
+    // 症状ベース・自由記述ベースで補完
     const symptomKeys = buildSymptomProblemKeys();
     const existing = new Set(state.problems.map(p => p.key));
     symptomKeys.forEach(k => {
@@ -236,9 +397,35 @@ els.btnAnalyze.addEventListener('click', async () => {
     if (state.problems.length > 1){
       state.problems = state.problems.filter(p => p.key !== 'general');
     }
-    state.program = build30DayProgram(state.problems.map(p=>p.key));
+    // 優先度順に並び替え
+    state.problems = reorderProblems(state.problems);
+    state.program = build30DayProgram(state.problems.map(p=>p.key), {
+      timeBudget: state.timeBudget,
+      goal: state.goal,
+      priorityKeys: state.priorityKeys,
+      ageGroup: state.ageGroup,
+      lifestyle: state.lifestyle,
+    });
 
     renderAll();
+    // 履歴を保存 (サムネ+スコア+メタ)
+    try {
+      const score = calcScore(state.result, state.problems);
+      const { grade, percentile } = gradeFromScore(score, { ageGroup: state.ageGroup });
+      const type = determineFaceType(state.problems, state.result.metrics);
+      const thumb = thumbnailFromCanvas(els.canvasFace, 240);
+      const meta = buildSnapshotMeta({
+        score, grade, percentile,
+        faceType: type.name,
+        ageGroup: state.ageGroup,
+        goal: state.goal,
+        problems: state.problems,
+        metrics: state.result.metrics,
+      });
+      saveSnapshot({ thumbDataUrl: thumb, meta });
+      renderProgress();
+    } catch(e){ console.warn('[progress] save failed', e); }
+
     hideLoader();
     els.results.hidden = false;
     els.results.classList.add('fade-in');
@@ -262,8 +449,126 @@ function renderAll(){
   renderProblems();
   renderKnowledge();
   renderToday();
+  renderProgramMeta();
   renderProgram(state.currentPhase);
+  renderProgress();
 }
+
+// ===== Progress (履歴) =====
+const METRIC_LABEL = {
+  midlineTilt:'中心軸の傾き', eyeHeightDiff:'目の高さ差', browHeightDiff:'眉の高さ差',
+  mouthTilt:'口角の傾き', jawSlackRatio:'フェイスラインのたるみ', mouthCornerDrop:'口角の下がり',
+  nasolabialDepth:'ほうれい線の深さ', puffinessIdx:'むくみ指数',
+};
+function renderProgress(){
+  const snaps = listSnapshots();
+  if (els.progressStat) els.progressStat.textContent = `履歴: ${snaps.length}件`;
+  if (els.btnCompare) els.btnCompare.disabled = snaps.length < 2;
+  if (!els.progressTimeline) return;
+  if (snaps.length === 0){
+    els.progressEmpty.hidden = false;
+    els.progressTimeline.innerHTML = '';
+    if (els.baStage) els.baStage.hidden = true;
+    return;
+  }
+  els.progressEmpty.hidden = true;
+  els.progressTimeline.innerHTML = snaps.map((s, i) => progressItemHTML(s, i, snaps.length)).join('');
+  els.progressTimeline.querySelectorAll('.progress-item').forEach(it => {
+    it.addEventListener('click', e => {
+      if (e.target.closest('.progress-del')) return;
+      // クリックで最新と比較表示
+      const id = it.dataset.id;
+      const other = snaps.find(x => x.id === id);
+      const latest = snaps[0];
+      if (!other || other.id === latest.id) return;
+      showBeforeAfter(other, latest);
+    });
+  });
+  els.progressTimeline.querySelectorAll('.progress-del').forEach(b => {
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = b.dataset.id;
+      deleteSnapshot(id);
+      renderProgress();
+    });
+  });
+}
+function progressItemHTML(s, i, total){
+  const date = new Date(s.createdAt);
+  const dateStr = `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+  const badge = i === 0 ? '<span class="progress-badge latest">最新</span>' : '';
+  const thumb = s.thumb
+    ? `<img class="progress-thumb" src="${s.thumb}" alt="snapshot"/>`
+    : `<div class="progress-thumb noimg">no img</div>`;
+  return `
+    <div class="progress-item" data-id="${s.id}">
+      ${thumb}
+      <div class="progress-meta">
+        <div class="progress-score">${s.score ?? '--'}<small>/100</small> <span class="progress-grade">${s.grade ?? ''}</span> ${badge}</div>
+        <div class="progress-date">${dateStr}</div>
+        <div class="progress-type">${s.faceType ?? ''}</div>
+      </div>
+      <button class="progress-del" data-id="${s.id}" title="削除">×</button>
+    </div>
+  `;
+}
+function showBeforeAfter(before, after){
+  if (!els.baStage) return;
+  if (!before.thumb || !after.thumb){
+    alert('サムネイル未保存のため比較表示できません');
+    return;
+  }
+  els.baBefore.src = before.thumb;
+  els.baAfter.src  = after.thumb;
+  els.baStage.hidden = false;
+  els.baSlider.value = 50;
+  updateBaClip(50);
+  // メタ
+  const days = Math.round((new Date(after.createdAt) - new Date(before.createdAt)) / 86400000);
+  const sd   = (after.score ?? 0) - (before.score ?? 0);
+  const sign = sd >= 0 ? '+' : '';
+  const tone = sd > 0 ? 'up' : sd < 0 ? 'down' : 'flat';
+  const km1 = before.keyMetrics || {}, km2 = after.keyMetrics || {};
+  const metricRows = Object.keys(km2)
+    .filter(k => k in km1)
+    .map(k => {
+      const d = (km2[k] - km1[k]);
+      const dStr = (d >= 0 ? '+' : '') + (Math.round(d*1000)/1000);
+      // 多くの指標は 0 に近いほど良いので、|after| - |before| を改善符号とする
+      const improve = Math.abs(km2[k]) - Math.abs(km1[k]); // - なら改善
+      const cls = improve < 0 ? 'up' : improve > 0 ? 'down' : 'flat';
+      return `<div class="ba-row ${cls}"><span>${METRIC_LABEL[k] || k}</span><i>${km1[k]} → ${km2[k]}</i><b>${dStr}</b></div>`;
+    }).join('');
+  els.baMeta.innerHTML = `
+    <div class="ba-summary"><strong>${days}日</strong> でスコア <span class="ba-delta ${tone}">${sign}${sd}</span> 変化</div>
+    <div class="ba-metric-list">${metricRows}</div>
+  `;
+  els.baStage.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function updateBaClip(v){
+  if (!els.baAfter) return;
+  els.baAfter.style.clipPath = `inset(0 0 0 ${v}%)`;
+}
+if (els.baSlider){
+  els.baSlider.addEventListener('input', e => updateBaClip(+e.target.value));
+}
+if (els.btnCompare){
+  els.btnCompare.addEventListener('click', () => {
+    const snaps = listSnapshots();
+    if (snaps.length < 2) return;
+    showBeforeAfter(snaps[snaps.length - 1], snaps[0]); // 最古 vs 最新
+  });
+}
+if (els.btnClearHistory){
+  els.btnClearHistory.addEventListener('click', () => {
+    if (!confirm('履歴をすべて削除しますか？この操作は元に戻せません。')) return;
+    clearHistory();
+    renderProgress();
+    if (els.baStage) els.baStage.hidden = true;
+  });
+}
+// 起動時にも履歴表示を更新(結果未表示でも履歴は残るが、UIは hidden 内なので影響なし)
+document.addEventListener('DOMContentLoaded', () => { renderProgress(); });
 
 function renderSymptomSummary(){
   const has = state.symptoms.length > 0 || state.symptomFree;
@@ -284,7 +589,7 @@ function escapeHtml(s){
 
 function renderScoreAndType(){
   const score = calcScore(state.result, state.problems);
-  const { grade, desc } = gradeFromScore(score);
+  const { grade, desc } = gradeFromScore(score, { ageGroup: state.ageGroup });
   els.scoreValue.textContent = score;
   els.scoreGrade.textContent = grade;
   els.scoreDesc.textContent = desc;
@@ -504,9 +809,33 @@ function renderKnowledge(){
 
 // ===== Today menu =====
 function renderToday(){
-  const menu = pickTodayMenu(state.problems.map(p => p.key));
-  els.todayGrid.innerHTML = menu.training.map(ex => exerciseCard(ex)).join('');
+  // 30日プログラムの Day1 の training を流用(同じ設計ロジック)
+  const day1 = state.program?.[0];
+  if (!day1) return;
+  els.todayGrid.innerHTML = day1.training.map(ex => exerciseCard(ex)).join('');
   bindExerciseCards(els.todayGrid);
+  if (els.todayReason && day1.reason){
+    els.todayReason.innerHTML = `<span class="reason-title">🎯 なぜ今日この${day1.training.length}種なのか</span>${escapeHtml(day1.reason)}`;
+  }
+}
+
+function renderProgramMeta(){
+  if (!els.programMeta) return;
+  const goalLabel = { liftup:'リフトアップ', symmetry:'左右対称', antiAging:'シワ対策', shrink:'小顔・むくみ', eyes:'目元印象UP', overall:'総合バランス' }[state.goal] || '総合バランス';
+  const priorityNames = state.priorityKeys.map(k => ({
+    facialAsymmetry:'左右非対称', mouthCornerDown:'口角下がり', nasolabialFold:'ほうれい線',
+    jawSagging:'たるみ', puffiness:'むくみ', partsBalance:'バランス',
+    masseterHypertrophy:'エラ張り', cheekHollow:'頬コケ', longPhiltrum:'人中',
+    gummySmile:'ガミー', hoodedEyelid:'まぶた', droopyEyeOuter:'目尻',
+    templeHollow:'こめかみ', foreheadLines:'額シワ', glabellarLines:'眉間シワ',
+  })[k] || k);
+  const priText = priorityNames.length ? priorityNames.join('・') : '自動選定';
+  els.programMeta.innerHTML = `
+    <span><strong>年代:</strong>${state.ageGroup.replace('s','代')}</span>
+    <span><strong>1日:</strong>${state.timeBudget}分</span>
+    <span><strong>ゴール:</strong>${goalLabel}</span>
+    <span><strong>優先:</strong>${priText}</span>
+  `;
 }
 function exerciseCard(ex){
   return `
@@ -577,6 +906,10 @@ function openExerciseModal(ex){
       </div>
     </div>
     <div class="modal-section">
+      <h4>🎬 動画ガイド (タイマー付き)</h4>
+      ${buildMotionPlayerHTML(ex.id)}
+    </div>
+    <div class="modal-section">
       <h4>🎯 ターゲット筋</h4>
       <ul>${ex.targets.map(t=>`<li>${t}</li>`).join('')}</ul>
     </div>
@@ -597,13 +930,17 @@ function openExerciseModal(ex){
     </div>
   `;
   showModal();
+  // 動画ガイドプレイヤー初期化
+  const player = els.modalBody.querySelector('.motion-player');
+  if (player) initMotionPlayer(player, ex.id);
 }
 function openDayModal(d){
   els.modalBody.innerHTML = `
     <div style="margin-bottom:24px">
       <div style="font-family:'Inter',sans-serif; font-size:12px; color:var(--brand); letter-spacing:.1em; font-weight:700">PHASE ${d.phase} · DAY ${d.day} ${d.isRest?'· REST':''}</div>
       <h2 style="margin:6px 0 4px; font-size:26px">${d.theme}</h2>
-      <p style="color:var(--muted); font-size:13px; margin:0">${d.isRest ? '今日は流して整える日。軽めの4種目で循環を上げましょう。' : '今日のトレーニング4種。クリックで詳細表示。'}</p>
+      <p style="color:var(--muted); font-size:13px; margin:0">${d.isRest ? '今日は流して整える日。軽めの種目で循環を上げましょう。' : 'クリックで各エクササイズの詳細を表示します。'}</p>
+      ${d.reason ? `<div class="reason-box" style="margin-top:14px"><span class="reason-title">🎯 この日の設計理由</span>${escapeHtml(d.reason)}</div>` : ''}
     </div>
     <div style="display:grid; gap:14px">
       ${d.training.map(ex => `

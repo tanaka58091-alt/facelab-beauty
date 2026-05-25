@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FaceLab Beauty｜顔から、私をもっと美しく。</title>
-<link rel="stylesheet" href="style.css?v=1" />
+<link rel="stylesheet" href="style.css?v=3" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;900&family=Zen+Maru+Gothic:wght@400;500;700;900&family=Great+Vibes&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -124,13 +124,13 @@
       <div class="stat-ico">
         <svg viewBox="0 0 32 32"><path d="M6 22 Q16 8 26 22 Z" fill="#FFB7C5"/><path d="M6 22 L26 22" stroke="#E07A8A" stroke-width="1.5"/><circle cx="16" cy="22" r="2" fill="#FFD93D"/></svg>
       </div>
-      <div class="stat-text"><strong>8</strong><span>診断指標</span></div>
+      <div class="stat-text"><strong>21</strong><span>診断指標</span></div>
     </div>
     <div>
       <div class="stat-ico">
         <svg viewBox="0 0 32 32"><path d="M16 27 C8 22 4 16 4 12 C4 8 7 5 11 5 C13 5 15 6 16 8 C17 6 19 5 21 5 C25 5 28 8 28 12 C28 16 24 22 16 27 Z" fill="#FFB7C5"/></svg>
       </div>
-      <div class="stat-text"><strong>25+</strong><span>表情筋トレ</span></div>
+      <div class="stat-text"><strong>74</strong><span>表情筋トレ</span></div>
     </div>
     <div>
       <div class="stat-ico">
@@ -185,27 +185,151 @@
     <div class="symptom-block">
       <div class="symptom-head">
         <h3>気になる顔のお悩み <span class="head-deco">🌷</span></h3>
-        <p class="muted">該当するものを選択してください。顔解析と組み合わせて、あなた専用のトレーニングを設計します。</p>
+        <p class="muted">該当するものをすべて選択。<strong>特に気になる3つ</strong>をダブルクリックで⭐優先に設定すると、トレーニングが集中設計されます。</p>
       </div>
       <div class="symptom-chips" id="symptom-chips">
-        <label class="chip"><input type="checkbox" value="asymEye"><span>目の左右差</span></label>
-        <label class="chip"><input type="checkbox" value="asymMouth"><span>口角の左右差</span></label>
-        <label class="chip"><input type="checkbox" value="asymBrow"><span>眉の高さの左右差</span></label>
-        <label class="chip"><input type="checkbox" value="sagJaw"><span>フェイスラインのたるみ</span></label>
-        <label class="chip"><input type="checkbox" value="doubleChin"><span>二重あご</span></label>
-        <label class="chip"><input type="checkbox" value="sagCheek"><span>頬のたるみ</span></label>
-        <label class="chip"><input type="checkbox" value="nasolabial"><span>ほうれい線</span></label>
-        <label class="chip"><input type="checkbox" value="mouthDown"><span>口角下がり</span></label>
-        <label class="chip"><input type="checkbox" value="eyeBag"><span>目の下のたるみ・くま</span></label>
-        <label class="chip"><input type="checkbox" value="puffyMorning"><span>朝のむくみ</span></label>
-        <label class="chip"><input type="checkbox" value="roundFace"><span>丸顔・小顔になりたい</span></label>
-        <label class="chip"><input type="checkbox" value="smallEye"><span>目を大きく見せたい</span></label>
-        <label class="chip"><input type="checkbox" value="bruxism"><span>食いしばり・噛み癖</span></label>
-        <label class="chip"><input type="checkbox" value="flatCheek"><span>頬がコケて見える</span></label>
+        <div class="chip-group">
+          <div class="chip-group-title">🪞 左右差</div>
+          <label class="chip" data-chip><input type="checkbox" value="asymEye"><span>目の左右差</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="asymMouth"><span>口角の左右差</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="asymBrow"><span>眉の高さの左右差</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="asymCheek"><span>頬の張りの左右差</span></label>
+        </div>
+        <div class="chip-group">
+          <div class="chip-group-title">⬇️ たるみ・輪郭</div>
+          <label class="chip" data-chip><input type="checkbox" value="sagJaw"><span>フェイスラインのたるみ</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="doubleChin"><span>二重あご</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="sagCheek"><span>頬のたるみ</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="marionette"><span>マリオネットライン</span></label>
+        </div>
+        <div class="chip-group">
+          <div class="chip-group-title">👄 口元</div>
+          <label class="chip" data-chip><input type="checkbox" value="nasolabial"><span>ほうれい線</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="mouthDown"><span>口角下がり</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="thinUpperLip"><span>上唇が薄い</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="longPhiltrum"><span>人中が長く見える</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="gummy"><span>ガミースマイル</span></label>
+        </div>
+        <div class="chip-group">
+          <div class="chip-group-title">💧 むくみ</div>
+          <label class="chip" data-chip><input type="checkbox" value="eyeBag"><span>目の下のたるみ・くま</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="puffyMorning"><span>朝のむくみ</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="roundFace"><span>丸顔・小顔になりたい</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="dullSkin"><span>顔色がくすむ</span></label>
+        </div>
+        <div class="chip-group">
+          <div class="chip-group-title">👁️ 目元</div>
+          <label class="chip" data-chip><input type="checkbox" value="smallEye"><span>目を大きく見せたい</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="hoodedEye"><span>まぶたが重い・厚い</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="droopyEye"><span>目尻が下がる</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="oneEyeSmall"><span>片目だけ小さい</span></label>
+        </div>
+        <div class="chip-group">
+          <div class="chip-group-title">🦴 エラ・咬筋</div>
+          <label class="chip" data-chip><input type="checkbox" value="bruxism"><span>食いしばり・噛み癖</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="jawAngular"><span>エラが張っている</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="hardCheek"><span>頬・側頭部が固い</span></label>
+        </div>
+        <div class="chip-group">
+          <div class="chip-group-title">🍂 痩せ・凹み</div>
+          <label class="chip" data-chip><input type="checkbox" value="flatCheek"><span>頬がコケて見える</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="templeHollow"><span>こめかみが凹む</span></label>
+        </div>
+        <div class="chip-group">
+          <div class="chip-group-title">🌊 シワ</div>
+          <label class="chip" data-chip><input type="checkbox" value="foreheadWrinkle"><span>額の横ジワ</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="glabellarWrinkle"><span>眉間のタテジワ</span></label>
+          <label class="chip" data-chip><input type="checkbox" value="crowsFeet"><span>目尻の小ジワ</span></label>
+        </div>
+        <div class="chip-group">
+          <div class="chip-group-title">✨ 印象</div>
+          <label class="chip" data-chip><input type="checkbox" value="partsBalance"><span>パーツバランスが気になる</span></label>
+        </div>
       </div>
       <div class="symptom-note">
-        <label for="symptom-free">その他のお悩み（任意）</label>
-        <textarea id="symptom-free" rows="2" placeholder="例：左の口角だけ上がりにくい／写真で右半分が大きく見える など"></textarea>
+        <label for="symptom-free">その他のお悩み・自由記述（任意）</label>
+        <textarea id="symptom-free" rows="2" placeholder="例：左の口角だけ上がりにくい／こめかみが凹んできた／笑うと歯茎が見える など"></textarea>
+        <div class="symptom-hint">💡 自由記述からもキーワードを自動抽出し、お悩みカテゴリに反映します</div>
+      </div>
+    </div>
+
+    <!-- ===== HEARING (年代・時間・ゴール・生活) ===== -->
+    <div class="hearing-block">
+      <div class="symptom-head">
+        <h3>もう少しあなたを教えてください <span class="head-deco">🎀</span></h3>
+        <p class="muted">あなたに合ったオーダーメイド設計のためのヒアリングです。</p>
+      </div>
+
+      <div class="hear-grid">
+        <div class="hear-row">
+          <div class="hear-label">年代</div>
+          <div class="radio-chips" data-name="ageGroup">
+            <label><input type="radio" name="ageGroup" value="10s"><span>10代</span></label>
+            <label><input type="radio" name="ageGroup" value="20s"><span>20代</span></label>
+            <label><input type="radio" name="ageGroup" value="30s" checked><span>30代</span></label>
+            <label><input type="radio" name="ageGroup" value="40s"><span>40代</span></label>
+            <label><input type="radio" name="ageGroup" value="50s"><span>50代</span></label>
+            <label><input type="radio" name="ageGroup" value="60s"><span>60代以上</span></label>
+          </div>
+        </div>
+
+        <div class="hear-row">
+          <div class="hear-label">1日にかけられる時間</div>
+          <div class="radio-chips" data-name="timeBudget">
+            <label><input type="radio" name="timeBudget" value="3"><span>3分</span></label>
+            <label><input type="radio" name="timeBudget" value="5" checked><span>5分</span></label>
+            <label><input type="radio" name="timeBudget" value="10"><span>10分</span></label>
+            <label><input type="radio" name="timeBudget" value="15"><span>15分</span></label>
+          </div>
+        </div>
+
+        <div class="hear-row">
+          <div class="hear-label">いちばんの目的</div>
+          <div class="radio-chips" data-name="goal">
+            <label><input type="radio" name="goal" value="liftup"><span>リフトアップ</span></label>
+            <label><input type="radio" name="goal" value="symmetry"><span>左右対称</span></label>
+            <label><input type="radio" name="goal" value="antiAging"><span>シワ対策</span></label>
+            <label><input type="radio" name="goal" value="shrink"><span>小顔・むくみ</span></label>
+            <label><input type="radio" name="goal" value="eyes"><span>目元印象UP</span></label>
+            <label><input type="radio" name="goal" value="overall" checked><span>総合バランス</span></label>
+          </div>
+        </div>
+
+        <div class="hear-row">
+          <div class="hear-label">睡眠時間</div>
+          <div class="radio-chips" data-name="sleep">
+            <label><input type="radio" name="sleep" value="short"><span>〜5時間</span></label>
+            <label><input type="radio" name="sleep" value="normal" checked><span>6〜7時間</span></label>
+            <label><input type="radio" name="sleep" value="long"><span>8時間〜</span></label>
+          </div>
+        </div>
+
+        <div class="hear-row">
+          <div class="hear-label">普段の姿勢</div>
+          <div class="radio-chips" data-name="posture">
+            <label><input type="radio" name="posture" value="smartphone"><span>スマホ時間が長い</span></label>
+            <label><input type="radio" name="posture" value="desk"><span>デスクワーク中心</span></label>
+            <label><input type="radio" name="posture" value="normal" checked><span>気にしていない</span></label>
+          </div>
+        </div>
+
+        <div class="hear-row">
+          <div class="hear-label">食事の噛み方</div>
+          <div class="radio-chips" data-name="diet">
+            <label><input type="radio" name="diet" value="hardChew"><span>硬いものをよく噛む</span></label>
+            <label><input type="radio" name="diet" value="softChew"><span>柔らかいものが多い</span></label>
+            <label><input type="radio" name="diet" value="normal" checked><span>普通</span></label>
+          </div>
+        </div>
+
+        <div class="hear-row">
+          <div class="hear-label">ストレス度</div>
+          <div class="radio-chips" data-name="stress">
+            <label><input type="radio" name="stress" value="high"><span>高い</span></label>
+            <label><input type="radio" name="stress" value="mid" checked><span>普通</span></label>
+            <label><input type="radio" name="stress" value="low"><span>低い</span></label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -353,9 +477,10 @@
       <div class="card-num">STEP<br/>05</div>
       <div>
         <h2>今日のあなた専用メニュー <span class="head-deco">🎀</span></h2>
-        <p class="muted">表情筋トレーニング4種目（約5〜10分）</p>
+        <p class="muted">時間配分・優先度・ゴール・生活習慣すべてを反映したオーダーメイド構成</p>
       </div>
     </div>
+    <div class="reason-box" id="today-reason"></div>
     <div class="today-grid" id="today-grid"></div>
   </section>
 
@@ -373,6 +498,7 @@
       <button class="phase-tab" data-phase="2">Phase 2<small>強化 Day11-20</small></button>
       <button class="phase-tab" data-phase="3">Phase 3<small>定着 Day21-30</small></button>
     </div>
+    <div class="program-meta" id="program-meta"></div>
     <div class="program-grid" id="program-grid"></div>
 
     <div class="actions" style="justify-content:flex-end; margin-top:24px;">
@@ -380,6 +506,38 @@
       <button class="btn-primary" id="btn-restart">
         <span class="btn-label">もう一度解析する</span>
       </button>
+    </div>
+  </section>
+
+  <!-- ===== PROGRESS TRACKER ===== -->
+  <section class="card progress-card">
+    <div class="card-head">
+      <div class="card-num">STEP<br/>07</div>
+      <div>
+        <h2>あなたの変化を見守る <span class="head-deco">📈</span></h2>
+        <p class="muted">解析するたびにこの端末に履歴を保存。Before/After のスライダーで変化を比較できます。</p>
+      </div>
+    </div>
+    <div class="progress-bar-row">
+      <div class="progress-stat" id="progress-stat">履歴: 0件</div>
+      <div class="progress-actions">
+        <button class="btn-progress" id="btn-compare" disabled>📊 Before/After を比較</button>
+        <button class="btn-progress ghost" id="btn-clear-history">🗑️ 履歴を消去</button>
+      </div>
+    </div>
+    <div class="progress-empty" id="progress-empty" hidden>
+      <p>まだ履歴がありません。週に1回、同じ条件で撮影して比較しましょう。</p>
+    </div>
+    <div class="progress-timeline" id="progress-timeline"></div>
+    <div class="ba-stage" id="ba-stage" hidden>
+      <div class="ba-pane">
+        <img class="ba-img ba-before" id="ba-before" alt="Before"/>
+        <img class="ba-img ba-after" id="ba-after" alt="After"/>
+        <div class="ba-label ba-label-before">Before</div>
+        <div class="ba-label ba-label-after">After</div>
+        <input type="range" min="0" max="100" value="50" class="ba-slider" id="ba-slider"/>
+      </div>
+      <div class="ba-meta" id="ba-meta"></div>
     </div>
   </section>
 </main>
