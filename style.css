@@ -1039,156 +1039,83 @@ body{
   font-weight: 700;
 }
 
-/* ===== KEYFRAMES (12 patterns) ===== */
-/* SVG パーツへの参照(class名) */
-.motion-svg .m-cheek-l, .motion-svg .m-cheek-r,
-.motion-svg .m-mouth, .motion-svg .m-lip,
-.motion-svg .m-corner-l, .motion-svg .m-corner-r,
-.motion-svg .m-eye-l, .motion-svg .m-eye-r,
-.motion-svg .m-brow-l, .motion-svg .m-brow-r,
-.motion-svg .m-tongue, .motion-svg .m-chin{
-  transform-box: fill-box;
-  transform-origin: center;
-  transition: transform .3s ease;
+/* ===== 矢印オーバーレイ用アニメーション ===== */
+/* ターゲット(🎯丸): 拡大縮小パルス */
+.motion-overlay .mv-target-dot{
+  transform-box: fill-box; transform-origin: center;
+  animation: mvTargetPulse 1.2s ease-in-out infinite;
+}
+.motion-overlay .mv-target-ring{
+  transform-box: fill-box; transform-origin: center;
+  animation: mvTargetRing 1.6s ease-out infinite;
+}
+@keyframes mvTargetPulse{
+  0%,100%{ transform: scale(1); opacity: 0.85; }
+  50%   { transform: scale(1.2); opacity: 1; }
+}
+@keyframes mvTargetRing{
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
 }
 
-/* cheekLift: 頬と口角を上に */
-.is-playing.anim-cheekLift .m-cheek-l{ animation: cheekLiftL 4s ease-in-out infinite; }
-.is-playing.anim-cheekLift .m-cheek-r{ animation: cheekLiftR 4s ease-in-out infinite; }
-.is-playing.anim-cheekLift .m-corner-l, .is-playing.anim-cheekLift .m-corner-r{ animation: cornerUp 4s ease-in-out infinite; }
-.is-playing.anim-cheekLift .m-lip{ animation: lipSmile 4s ease-in-out infinite; }
-@keyframes cheekLiftL{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(-4px,-8px) } }
-@keyframes cheekLiftR{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(4px,-8px) } }
-@keyframes cornerUp{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(0,-5px) } }
-@keyframes lipSmile{ 0%,100%{ d: path('M82 168 Q100 175 118 168') } 50%{ d: path('M82 165 Q100 178 118 165') } }
-
-/* mouthUp: 口角だけ持ち上げる */
-.is-playing.anim-mouthUp .m-corner-l{ animation: cornerL 3s ease-in-out infinite; }
-.is-playing.anim-mouthUp .m-corner-r{ animation: cornerR 3s ease-in-out infinite; }
-.is-playing.anim-mouthUp .m-lip{ animation: lipSmile 3s ease-in-out infinite; }
-@keyframes cornerL{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(-3px,-6px) } }
-@keyframes cornerR{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(3px,-6px) } }
-
-/* mouthWide: あいうえお */
-.is-playing.anim-mouthWide .m-mouth{ animation: aiueoMouth 5s steps(5, end) infinite; }
-@keyframes aiueoMouth{
-  0%   { transform: scale(1,1.3) }    /* あ */
-  20%  { transform: scale(1.3,0.7) }  /* い */
-  40%  { transform: scale(0.6,1.2) }  /* う */
-  60%  { transform: scale(1.1,1.1) }  /* え */
-  80%  { transform: scale(0.9,1.4) }  /* お */
-  100% { transform: scale(1,1) }
+/* 矢印: フェード+スライド(動きの方向を伝える) */
+.motion-overlay .mv-arrow{
+  animation: mvArrowSlide 1.4s ease-in-out infinite;
+  stroke-dasharray: 4 3;
+}
+@keyframes mvArrowSlide{
+  0%   { opacity: 0.2; stroke-dashoffset: 14; }
+  50%  { opacity: 1;   stroke-dashoffset: 0; }
+  100% { opacity: 0.2; stroke-dashoffset: -14; }
 }
 
-/* cheekPump: 頬ふくらませる */
-.is-playing.anim-cheekPump .m-cheek-l{ animation: pump 2.5s ease-in-out infinite; }
-.is-playing.anim-cheekPump .m-cheek-r{ animation: pump 2.5s ease-in-out infinite; }
-@keyframes pump{ 0%,100%{ transform: scale(1) } 50%{ transform: scale(1.6) } }
-
-/* cheekSide: 左右交互 */
-.is-playing.anim-cheekSide .m-cheek-l{ animation: sideL 4s ease-in-out infinite; }
-.is-playing.anim-cheekSide .m-cheek-r{ animation: sideR 4s ease-in-out infinite; }
-@keyframes sideL{ 0%,50%,100%{ transform: scale(1) } 25%{ transform: scale(1.8) } }
-@keyframes sideR{ 0%,50%,100%{ transform: scale(1) } 75%{ transform: scale(1.8) } }
-
-/* tongueRotate: 舌が回る */
-.is-playing.anim-tongueRotate .m-tongue{ animation: tongueR 3s linear infinite; }
-@keyframes tongueR{
-  0%   { rx:5; ry:3; opacity:1; transform: translate(-15px,0) }
-  25%  { transform: translate(0,-12px) }
-  50%  { transform: translate(15px,0) }
-  75%  { transform: translate(0,8px) }
-  100% { transform: translate(-15px,0); opacity:1 }
+/* 手アイコン: タップ系で使う */
+.motion-overlay .mv-hand{
+  transform-box: fill-box; transform-origin: center;
+  animation: mvHandTap 0.6s ease-in-out infinite;
+}
+@keyframes mvHandTap{
+  0%,100%{ transform: scale(1) }
+  50%    { transform: scale(0.92) translateY(2px) }
 }
 
-/* tongueSpot: 舌スポット(上に押し付け) */
-.is-playing.anim-tongueSpot .m-tongue{ animation: tongueSpot 3s ease-in-out infinite; }
-@keyframes tongueSpot{
-  0%,100%{ rx:5; ry:3; opacity:1; transform: translate(0,0) }
-  50%    { rx:8; ry:2; opacity:1; transform: translate(0,-25px) }
+/* ステージのフェード: ステップ切り替え時のオーバーレイを滑らかに */
+.motion-overlay > *{
+  animation-fill-mode: both;
 }
 
-/* browLift: 眉を上に */
-.is-playing.anim-browLift .m-brow-l, .is-playing.anim-browLift .m-brow-r{ animation: browUp 3s ease-in-out infinite; }
-.is-playing.anim-browLift .m-eye-l, .is-playing.anim-browLift .m-eye-r{ animation: eyeBig 3s ease-in-out infinite; }
-@keyframes browUp{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(0,-8px) } }
-@keyframes eyeBig{ 0%,100%{ transform: scaleY(1) } 50%{ transform: scaleY(1.4) } }
-
-/* eyeOpen: 目を見開く */
-.is-playing.anim-eyeOpen .m-eye-l, .is-playing.anim-eyeOpen .m-eye-r{ animation: eyeOpen 2.5s ease-in-out infinite; }
-@keyframes eyeOpen{ 0%,100%{ transform: scaleY(1) } 30%{ transform: scaleY(0.1) } 60%{ transform: scaleY(1.5) } }
-
-/* eyeLid: 下まぶた引き上げ */
-.is-playing.anim-eyeLid .m-eye-l, .is-playing.anim-eyeLid .m-eye-r{ animation: eyeLid 3s ease-in-out infinite; }
-@keyframes eyeLid{ 0%,100%{ transform: scaleY(1) } 50%{ transform: scaleY(0.6) translateY(2px) } }
-
-/* eyeOuter: 目尻上げ */
-.is-playing.anim-eyeOuter .m-eye-l{ animation: outerL 3s ease-in-out infinite; }
-.is-playing.anim-eyeOuter .m-eye-r{ animation: outerR 3s ease-in-out infinite; }
-@keyframes outerL{ 0%,100%{ transform: rotate(0) } 50%{ transform: rotate(-12deg) translateY(-3px) } }
-@keyframes outerR{ 0%,100%{ transform: rotate(0) } 50%{ transform: rotate(12deg) translateY(-3px) } }
-
-/* winkAlt: 交互ウィンク */
-.is-playing.anim-winkAlt .m-eye-l{ animation: winkL 2s ease-in-out infinite; }
-.is-playing.anim-winkAlt .m-eye-r{ animation: winkR 2s ease-in-out infinite; }
-@keyframes winkL{ 0%,50%,100%{ transform: scaleY(1) } 25%{ transform: scaleY(0.1) } }
-@keyframes winkR{ 0%,50%,100%{ transform: scaleY(1) } 75%{ transform: scaleY(0.1) } }
-
-/* jawOpen: 顎を開く */
-.is-playing.anim-jawOpen .m-mouth{ animation: jawO 3s ease-in-out infinite; }
-.is-playing.anim-jawOpen .m-chin{ animation: chinDown 3s ease-in-out infinite; }
-@keyframes jawO{ 0%,100%{ transform: scaleY(1) } 50%{ transform: scaleY(2.5) translateY(6px) } }
-@keyframes chinDown{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(0,8px) } }
-
-/* chinTuck: 顎引き */
-.is-playing.anim-chinTuck .m-chin{ animation: chinBack 3s ease-in-out infinite; }
-@keyframes chinBack{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(0,-3px) scaleY(0.8) } }
-
-/* jawSlide: 顎スライド */
-.is-playing.anim-jawSlide .m-mouth{ animation: jawSL 4s ease-in-out infinite; }
-.is-playing.anim-jawSlide .m-chin{ animation: jawSL 4s ease-in-out infinite; }
-@keyframes jawSL{
-  0%,100%{ transform: translate(0,0) }
-  25%    { transform: translate(0,4px) }
-  50%    { transform: translate(8px,2px) }
-  75%    { transform: translate(-8px,2px) }
+/* ステージ枠: 再生中は薄く強調 */
+.is-playing.motion-stage{
+  box-shadow: 0 0 0 3px rgba(255, 77, 122, 0.18);
 }
 
-/* neckStretch: 首前面伸ばす */
-.is-playing.anim-neckStretch .m-chin{ animation: chinUp 4s ease-in-out infinite; }
-.is-playing.anim-neckStretch .m-mouth{ animation: lipDown 4s ease-in-out infinite; }
-@keyframes chinUp{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(0,-6px) } }
-@keyframes lipDown{ 0%,100%{ transform: translate(0,0) } 50%{ transform: translate(0,3px) scaleY(0.7) } }
+/* バッジ(エクササイズ名 + セット表記) */
+.motion-badge{
+  position: absolute; top: 10px; left: 14px;
+  display: flex; flex-direction: column; gap: 2px;
+  background: rgba(255,255,255,0.92);
+  padding: 6px 10px; border-radius: 8px;
+  border-left: 3px solid var(--brand);
+}
+.motion-badge .mv-name{ font-size: 11px; font-weight: 800; color: var(--ink); letter-spacing: .02em; }
+.motion-badge .mv-reps{ font-size: 10px; color: var(--brand); font-weight: 700; }
 
-/* asymSide: 左右独立 */
-.is-playing.anim-asymSide .m-corner-l{ animation: asymL 3s ease-in-out infinite; }
-.is-playing.anim-asymSide .m-corner-r{ animation: asymR 3s ease-in-out infinite; }
-@keyframes asymL{ 0%,50%,100%{ transform: translate(0,0) } 25%{ transform: translate(-2px,-6px) } }
-@keyframes asymR{ 0%,50%,100%{ transform: translate(0,0) } 75%{ transform: translate(2px,-6px) } }
-
-/* lipPress: 上唇を上に */
-.is-playing.anim-lipPress .m-lip{ animation: lipUp 3s ease-in-out infinite; }
-@keyframes lipUp{ 0%,100%{ transform: translate(0,0) scaleY(1) } 50%{ transform: translate(0,-4px) scaleY(0.7) } }
-
-/* masseterTap: 咬筋タッピング */
-.is-playing.anim-masseterTap .m-cheek-l{ animation: tapL 0.6s ease-in-out infinite; }
-.is-playing.anim-masseterTap .m-cheek-r{ animation: tapR 0.6s ease-in-out infinite; }
-@keyframes tapL{ 0%,100%{ transform: scale(1) } 50%{ transform: scale(0.92) translateX(-1px) } }
-@keyframes tapR{ 0%,100%{ transform: scale(1) } 50%{ transform: scale(0.92) translateX(1px) } }
-
-/* fullFlow: 全部統合 */
-.is-playing.anim-fullFlow .m-brow-l{ animation: browUp 4s ease-in-out infinite; }
-.is-playing.anim-fullFlow .m-brow-r{ animation: browUp 4s ease-in-out infinite; }
-.is-playing.anim-fullFlow .m-eye-l{ animation: eyeBig 4s ease-in-out infinite; }
-.is-playing.anim-fullFlow .m-eye-r{ animation: eyeBig 4s ease-in-out infinite; }
-.is-playing.anim-fullFlow .m-cheek-l{ animation: cheekLiftL 4s ease-in-out infinite; }
-.is-playing.anim-fullFlow .m-cheek-r{ animation: cheekLiftR 4s ease-in-out infinite; }
-.is-playing.anim-fullFlow .m-corner-l{ animation: cornerL 4s ease-in-out infinite; }
-.is-playing.anim-fullFlow .m-corner-r{ animation: cornerR 4s ease-in-out infinite; }
-
-/* breathGlow: 呼吸 */
-.is-playing.anim-breathGlow .motion-svg{ animation: breath 8s ease-in-out infinite; }
-@keyframes breath{ 0%,100%{ transform: scale(1); filter: brightness(1) } 50%{ transform: scale(1.04); filter: brightness(1.08) } }
+/* ステップラベルを目立たせる */
+.motion-step-row{
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 6px;
+}
+.motion-step-label{
+  display: inline-block;
+  padding: 4px 12px; border-radius: 999px;
+  background: var(--brand); color: #fff;
+  font-size: 13px; font-weight: 800; letter-spacing: .05em;
+}
+.motion-step-count{
+  font-family: 'Inter', monospace;
+  font-size: 12px; color: var(--brand);
+  font-weight: 700;
+}
 
 
 /* ============ PROGRESS TRACKER (軌跡) ============ */
