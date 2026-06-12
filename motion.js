@@ -640,6 +640,55 @@ export function getMotion(exerciseId){
   return { pattern: pat, ...preset };
 }
 
+// ===================================================================
+// STEP PANELS — 手順パネル式イラスト (静止画だけで分かる)
+// 各ステップを「番号 + 顔イラスト(動かす場所・方向) + 大きな説明文」の
+// パネルに変換し、マンガのコマのように並べて見せる。
+// 解剖学を知らなくても、絵と短い言葉だけで手順が追えることがゴール。
+// ===================================================================
+export function buildStepPanelsHTML(exerciseId){
+  const m = getMotion(exerciseId);
+  const panels = m.steps.map((s, i) => {
+    const overlay = s.overlay || '';
+    const isDone = !overlay.trim(); // 完了/脱力ステップは "おつかれさま" 系
+    return `
+      <figure class="step-panel${isDone ? ' is-done' : ''}">
+        <div class="step-panel-num">${i + 1}</div>
+        <div class="step-panel-stage">
+          <svg viewBox="0 0 200 230" class="step-panel-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${(s.label || '').replace(/"/g,'')}">
+            ${FACE_BASE_SVG}
+            <g class="step-panel-overlay">${overlay}</g>
+          </svg>
+        </div>
+        <figcaption class="step-panel-cap">
+          <div class="step-panel-label">${s.label || ''}${s.count ? ` <span class="step-panel-count">${s.count}</span>` : ''}</div>
+          <div class="step-panel-cue">${s.cue || ''}</div>
+        </figcaption>
+      </figure>`;
+  }).join('');
+
+  return `
+    <div class="step-guide" data-pattern="${m.pattern}">
+      <div class="step-guide-head">
+        <div>
+          <div class="step-guide-title">${m.name}</div>
+          <div class="step-guide-reps">${m.reps || ''}</div>
+        </div>
+        <div class="step-legend">
+          <span class="legend-item"><span class="legend-dot"></span>動かす場所</span>
+          <span class="legend-item"><span class="legend-arrow pink">➜</span>動かす方向</span>
+          <span class="legend-item"><span class="legend-arrow blue">➜</span>ふくらます/押し出す</span>
+        </div>
+      </div>
+      <div class="step-panels">${panels}</div>
+      <details class="step-anim">
+        <summary>▶ アニメで通して見る（タイマー付き）</summary>
+        <div class="step-anim-mount" data-ex="${exerciseId}"></div>
+      </details>
+    </div>
+  `;
+}
+
 export function buildMotionPlayerHTML(exerciseId){
   const m = getMotion(exerciseId);
   return `

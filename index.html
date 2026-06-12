@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FaceLab Beauty｜顔から、私をもっと美しく。</title>
-<link rel="stylesheet" href="style.css?v=5" />
+<link rel="stylesheet" href="style.css?v=10" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;900&family=Zen+Maru+Gothic:wght@400;500;700;900&family=Great+Vibes&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -143,6 +143,24 @@
 
 <!-- ============ UPLOAD ============ -->
 <section class="upload-section" id="upload-section">
+  <div class="profile-bar card" id="profile-bar">
+    <div class="profile-bar-main">
+      <span class="profile-ico">👤</span>
+      <div class="profile-select-wrap">
+        <label class="profile-label" for="profile-select">あなたのプロフィール</label>
+        <select id="profile-select" class="profile-select"></select>
+      </div>
+    </div>
+    <div class="profile-bar-actions">
+      <button class="btn-profile" id="btn-profile-new" title="新しいプロフィールを作成">＋ 新規</button>
+      <button class="btn-profile" id="btn-profile-rename" title="名前を変更">✎ 名前変更</button>
+      <button class="btn-profile" id="btn-profile-export" title="この端末のデータをファイルに書き出し">⬇ バックアップ</button>
+      <button class="btn-profile" id="btn-profile-import" title="バックアップファイルを読み込み">⬆ 読み込み</button>
+      <button class="btn-profile ghost" id="btn-profile-delete" title="このプロフィールを削除">🗑</button>
+      <input type="file" id="profile-import-file" accept="application/json,.json" hidden />
+    </div>
+    <p class="profile-note">📌 データはこの端末の中だけに、プロフィールごとに保存されます。機種変更や履歴消去に備えて、ときどき「バックアップ」で書き出しておきましょう。</p>
+  </div>
   <div class="upload-main card">
     <div class="card-head">
       <div class="card-num">STEP<br/>01</div>
@@ -490,6 +508,7 @@
     </div>
     <div id="symptom-summary" class="symptom-summary" hidden></div>
     <div class="problems-list" id="problems-list"></div>
+    <div class="prescription-link" id="prescription-link" hidden></div>
   </section>
 
   <!-- ===== KNOWLEDGE ===== -->
@@ -561,6 +580,7 @@
     <div class="progress-empty" id="progress-empty" hidden>
       <p>まだ履歴がありません。週に1回、同じ条件で撮影して比較しましょう。</p>
     </div>
+    <div class="score-trend" id="score-trend" hidden></div>
     <div class="progress-timeline" id="progress-timeline"></div>
     <div class="ba-stage" id="ba-stage" hidden>
       <div class="ba-pane">

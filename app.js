@@ -5,14 +5,19 @@ import {
   analyzeFace, detectProblems, determineFaceType,
   calcScore, gradeFromScore, buildMetricsList, FM,
 } from './analyzer.js';
-import { EXERCISES, getMeta, CONTRA_LABEL, TIME_OF_DAY_LABEL, TOOLS_LABEL } from './exercises.js';
+import { EXERCISES, getMeta, CONTRA_LABEL, TIME_OF_DAY_LABEL, TOOLS_LABEL, PRESCRIPTION_MAP, isExerciseAllowed } from './exercises.js';
 import { pickTodayMenu, build30DayProgram } from './program.js';
 import { getKnowledgeFor } from './knowledge.js';
-import { buildMotionPlayerHTML, initMotionPlayer } from './motion.js';
+import { buildMotionPlayerHTML, initMotionPlayer, buildStepPanelsHTML } from './motion.js';
 import {
   saveSnapshot, listSnapshots, clearHistory, deleteSnapshot,
   thumbnailFromCanvas, buildSnapshotMeta,
 } from './progress.js';
+import {
+  ensureInit as ensureProfiles, listProfiles, getActiveProfile, getActiveProfileId,
+  setActiveProfileId, createProfile, renameProfile, deleteProfile,
+  ns as profileNs, PREFS_KEY_BASE, exportActiveProfile, importProfileData,
+} from './profiles.js';
 
 const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -126,10 +131,10 @@ function detectSeason(){
   return 'winter';
 }
 
-const USER_PREFS_KEY = 'facelab.userPrefs.v1';
+function userPrefsKey(){ return profileNs(PREFS_KEY_BASE); }
 function saveUserPrefs(){
   try {
-    localStorage.setItem(USER_PREFS_KEY, JSON.stringify({
+    localStorage.setItem(userPrefsKey(), JSON.stringify({
       ageGroup: state.ageGroup, timeBudget: state.timeBudget, goal: state.goal,
       lifestyle: state.lifestyle, contra: state.contra,
       lifeStage: state.lifeStage, timeOfDay: state.timeOfDay,
@@ -138,7 +143,7 @@ function saveUserPrefs(){
 }
 function loadUserPrefs(){
   try {
-    const raw = localStorage.getItem(USER_PREFS_KEY);
+    const raw = localStorage.getItem(userPrefsKey());
     if (!raw) return;
     const p = JSON.parse(raw);
     if (p.ageGroup)  state.ageGroup  = p.ageGroup;
@@ -474,7 +479,7 @@ els.btnAnalyze.addEventListener('click', async () => {
       const score = calcScore(state.result, state.problems);
       const { grade, percentile } = gradeFromScore(score, { ageGroup: state.ageGroup });
       const type = determineFaceType(state.problems, state.result.metrics);
-      const thumb = thumbnailFromCanvas(els.canvasFace, 240);
+      const thumb = thumbnailFromCanvas(els.canvasFace, 480);
       const meta = buildSnapshotMeta({
         score, grade, percentile,
         faceType: type.name,
@@ -509,6 +514,7 @@ function renderAll(){
   renderSymptomSummary();
   renderSideScores();
   renderProblems();
+  renderPrescriptionLink();
   renderKnowledge();
   renderToday();
   renderProgramMeta();
@@ -570,6 +576,56 @@ function renderSideScores(){
   `;
 }
 
+// ===== お悩み → 効く顔トレ の明示連動 (③) =====
+function renderPrescriptionLink(){
+  const host = document.getElementById('prescription-link');
+  if (!host) return;
+  const probs = (state.problems || []).filter(p => p.key && p.key !== 'general');
+  if (!probs.length){ host.hidden = true; host.innerHTML = ''; return; }
+  const prioritySet = new Set(state.priorityKeys || []);
+  // 優先お悩みを前に
+  const ordered = [...probs].sort((a, b) =>
+    (prioritySet.has(b.key) ? 1 : 0) - (prioritySet.has(a.key) ? 1 : 0));
+
+  const cards = ordered.slice(0, 6).map(p => {
+    const map = PRESCRIPTION_MAP[p.key];
+    const ids = (map ? map.training : [])
+      .filter(id => EXERCISES[id] && isExerciseAllowed(id, state.contra))
+      .slice(0, 4);
+    if (!ids.length) return '';
+    const chips = ids.map(id =>
+      `<button class="rx-ex" data-ex="${id}" type="button">${EXERCISES[id].name}</button>`).join('');
+    const star = prioritySet.has(p.key) ? '<span class="rx-star">⭐優先</span>' : '';
+    return `
+      <div class="rx-card${prioritySet.has(p.key) ? ' is-priority' : ''}">
+        <div class="rx-problem">${escapeHtml(p.title || p.key)}${star}</div>
+        <div class="rx-arrow">この悩みに効く顔トレ ↓</div>
+        <div class="rx-exs">${chips}</div>
+      </div>`;
+  }).filter(Boolean).join('');
+
+  if (!cards){ host.hidden = true; host.innerHTML = ''; return; }
+
+  const freeNote = state.symptomFree
+    ? `<p class="rx-free">📝 あなたの記述「${escapeHtml(state.symptomFree)}」もキーワード解析して処方に反映しています。</p>`
+    : '';
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="rx-head">
+      <h3>🎯 あなたのお悩み → 効く顔トレ</h3>
+      <p class="muted">気になるお悩みに<strong>直結する顔トレだけ</strong>を自動で選びました。種目名をタップすると、やり方が見られます。</p>
+    </div>
+    ${freeNote}
+    <div class="rx-grid">${cards}</div>
+  `;
+  host.querySelectorAll('.rx-ex').forEach(b => {
+    b.addEventListener('click', () => {
+      const ex = EXERCISES[b.dataset.ex];
+      if (ex) openExerciseModal(ex);
+    });
+  });
+}
+
 // ===== Progress (履歴) =====
 const METRIC_LABEL = {
   midlineTilt:'中心軸の傾き', eyeHeightDiff:'目の高さ差', browHeightDiff:'眉の高さ差',
@@ -584,10 +640,13 @@ function renderProgress(){
   if (snaps.length === 0){
     els.progressEmpty.hidden = false;
     els.progressTimeline.innerHTML = '';
+    const trendHost = document.getElementById('score-trend');
+    if (trendHost){ trendHost.hidden = true; trendHost.innerHTML = ''; }
     if (els.baStage) els.baStage.hidden = true;
     return;
   }
   els.progressEmpty.hidden = true;
+  renderScoreTrend(snaps);
   els.progressTimeline.innerHTML = snaps.map((s, i) => progressItemHTML(s, i, snaps.length)).join('');
   els.progressTimeline.querySelectorAll('.progress-item').forEach(it => {
     it.addEventListener('click', e => {
@@ -628,6 +687,106 @@ function progressItemHTML(s, i, total){
     </div>
   `;
 }
+// ===== スコア推移グラフ (② 変化を追える) =====
+// snaps は最新→古い順。チャートは古い→最新で描画する。
+function renderScoreTrend(snapsNewestFirst){
+  const host = document.getElementById('score-trend');
+  if (!host) return;
+  const snaps = (snapsNewestFirst || []).slice().reverse(); // 古い→最新
+  const pts = snaps.filter(s => typeof s.score === 'number');
+  if (pts.length < 2){
+    host.hidden = true; host.innerHTML = '';
+    return;
+  }
+  host.hidden = false;
+
+  const scores = pts.map(s => s.score);
+  const first = scores[0];
+  const last  = scores[scores.length - 1];
+  const best  = Math.max(...scores);
+  const delta = last - first;
+
+  // 描画範囲(読みやすさのため動的レンジ、0-100でクランプ)
+  const lo = Math.max(0, Math.min(...scores) - 6);
+  const hi = Math.min(100, Math.max(...scores) + 6);
+  const span = Math.max(1, hi - lo);
+
+  const W = 560, H = 190, padL = 34, padR = 16, padT = 16, padB = 30;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const x = i => padL + (pts.length === 1 ? innerW/2 : (i / (pts.length - 1)) * innerW);
+  const y = v => padT + (1 - (v - lo) / span) * innerH;
+
+  // グリッド(横線4本)
+  const gridVals = [lo, lo + span*0.33, lo + span*0.66, hi].map(v => Math.round(v));
+  const gridLines = gridVals.map(v => {
+    const gy = y(v);
+    return `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${W-padR}" y2="${gy.toFixed(1)}" class="trend-grid"/>
+            <text x="${padL-6}" y="${(gy+3).toFixed(1)}" class="trend-axis-y">${v}</text>`;
+  }).join('');
+
+  const linePts = pts.map((s, i) => `${x(i).toFixed(1)},${y(s.score).toFixed(1)}`).join(' ');
+  const areaPath = `M ${padL},${(padT+innerH).toFixed(1)} L ${pts.map((s,i)=>`${x(i).toFixed(1)},${y(s.score).toFixed(1)}`).join(' L ')} L ${(W-padR).toFixed(1)},${(padT+innerH).toFixed(1)} Z`;
+
+  const dots = pts.map((s, i) => {
+    const isLast = i === pts.length - 1;
+    const isFirst = i === 0;
+    const r = (isLast || isFirst) ? 4.5 : 3;
+    const cls = isLast ? 'trend-dot last' : 'trend-dot';
+    return `<circle cx="${x(i).toFixed(1)}" cy="${y(s.score).toFixed(1)}" r="${r}" class="${cls}"><title>${s.score}点 (${fmtShortDate(s.createdAt)})</title></circle>`;
+  }).join('');
+
+  // 値ラベル(初回・最新)
+  const firstLabel = `<text x="${x(0).toFixed(1)}" y="${(y(first)-10).toFixed(1)}" class="trend-pt-label">${first}</text>`;
+  const lastLabel  = `<text x="${x(pts.length-1).toFixed(1)}" y="${(y(last)-10).toFixed(1)}" class="trend-pt-label strong" text-anchor="end">${last}</text>`;
+
+  const firstDate = `<text x="${padL}" y="${H-8}" class="trend-axis-x">${fmtShortDate(pts[0].createdAt)}</text>`;
+  const lastDate  = `<text x="${W-padR}" y="${H-8}" class="trend-axis-x" text-anchor="end">${fmtShortDate(pts[pts.length-1].createdAt)}</text>`;
+
+  const sign = delta > 0 ? '+' : '';
+  const tone = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
+  const deltaArrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '→';
+
+  // 主要指標の初回→最新の改善サマリ(絶対値が小さいほど改善)
+  const kmFirst = pts[0].keyMetrics || {};
+  const kmLast  = pts[pts.length-1].keyMetrics || {};
+  const metricRows = Object.keys(kmLast)
+    .filter(k => k in kmFirst && (k in METRIC_LABEL))
+    .map(k => {
+      const improve = Math.abs(kmLast[k]) - Math.abs(kmFirst[k]); // - で改善
+      const cls = improve < -0.002 ? 'up' : improve > 0.002 ? 'down' : 'flat';
+      const ico = cls === 'up' ? '▲改善' : cls === 'down' ? '▼悪化' : '→維持';
+      return `<div class="trend-metric ${cls}"><span>${METRIC_LABEL[k]}</span><b>${ico}</b></div>`;
+    }).join('');
+
+  host.innerHTML = `
+    <div class="trend-head">
+      <h3 class="trend-title">📈 スコアの推移</h3>
+      <div class="trend-stats">
+        <span class="trend-stat"><i>初回</i><b>${first}</b></span>
+        <span class="trend-stat"><i>最新</i><b>${last}</b></span>
+        <span class="trend-stat"><i>最高</i><b>${best}</b></span>
+        <span class="trend-stat delta ${tone}"><i>変化</i><b>${deltaArrow} ${sign}${delta}</b></span>
+      </div>
+    </div>
+    <div class="trend-chart-wrap">
+      <svg viewBox="0 0 ${W} ${H}" class="trend-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="スコア推移グラフ">
+        ${gridLines}
+        <path d="${areaPath}" class="trend-area"/>
+        <polyline points="${linePts}" class="trend-line"/>
+        ${dots}
+        ${firstLabel}${lastLabel}
+        ${firstDate}${lastDate}
+      </svg>
+    </div>
+    ${metricRows ? `<div class="trend-metrics"><span class="trend-metrics-cap">主要指標（初回→最新）</span>${metricRows}</div>` : ''}
+  `;
+}
+function fmtShortDate(iso){
+  const d = new Date(iso);
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
 function showBeforeAfter(before, after){
   if (!els.baStage) return;
   if (!before.thumb || !after.thumb){
@@ -645,18 +804,51 @@ function showBeforeAfter(before, after){
   const sign = sd >= 0 ? '+' : '';
   const tone = sd > 0 ? 'up' : sd < 0 ? 'down' : 'flat';
   const km1 = before.keyMetrics || {}, km2 = after.keyMetrics || {};
-  const metricRows = Object.keys(km2)
-    .filter(k => k in km1)
+  // 各指標の変化を集計(絶対値が小さいほど改善)
+  const changes = Object.keys(km2)
+    .filter(k => k in km1 && (k in METRIC_LABEL))
     .map(k => {
-      const d = (km2[k] - km1[k]);
-      const dStr = (d >= 0 ? '+' : '') + (Math.round(d*1000)/1000);
-      // 多くの指標は 0 に近いほど良いので、|after| - |before| を改善符号とする
+      const d = km2[k] - km1[k];
       const improve = Math.abs(km2[k]) - Math.abs(km1[k]); // - なら改善
-      const cls = improve < 0 ? 'up' : improve > 0 ? 'down' : 'flat';
-      return `<div class="ba-row ${cls}"><span>${METRIC_LABEL[k] || k}</span><i>${km1[k]} → ${km2[k]}</i><b>${dStr}</b></div>`;
-    }).join('');
+      return { k, label: METRIC_LABEL[k], from: km1[k], to: km2[k], d, improve };
+    });
+  const metricRows = changes.map(c => {
+    const dStr = (c.d >= 0 ? '+' : '') + (Math.round(c.d*1000)/1000);
+    const cls = c.improve < -0.002 ? 'up' : c.improve > 0.002 ? 'down' : 'flat';
+    const badge = cls === 'up' ? '改善' : cls === 'down' ? '悪化' : '維持';
+    return `<div class="ba-row ${cls}"><span>${c.label}</span><i>${c.from} → ${c.to}</i><b>${dStr} <em>${badge}</em></b></div>`;
+  }).join('');
+
+  // === 変化点のハイライト ===
+  const improved = changes.filter(c => c.improve < -0.002).sort((a,b) => a.improve - b.improve);
+  const worsened = changes.filter(c => c.improve >  0.002).sort((a,b) => b.improve - a.improve);
+  let highlight = '';
+  const chips = [];
+  if (improved.length){
+    chips.push(`<span class="ba-hl-chip up">✨ 最も改善：${improved[0].label}</span>`);
+    if (improved.length > 1) chips.push(`<span class="ba-hl-chip up soft">他 ${improved.length-1} 項目も改善</span>`);
+  }
+  if (worsened.length){
+    chips.push(`<span class="ba-hl-chip down">⚠ 注意：${worsened[0].label}</span>`);
+  }
+  if (!improved.length && !worsened.length){
+    chips.push(`<span class="ba-hl-chip flat">大きな変化なし（現状維持）</span>`);
+  }
+  const headline = sd > 0
+    ? `スコアが <b>${sd}pt</b> アップ！この調子で続けましょう 🌸`
+    : sd < 0
+      ? `スコアは <b>${Math.abs(sd)}pt</b> ダウン。撮影条件（光・表情・角度）も影響します。`
+      : `スコアは横ばい。フォームを見直して継続を 💪`;
+  highlight = `
+    <div class="ba-highlight ${tone}">
+      <div class="ba-hl-head">${headline}</div>
+      <div class="ba-hl-chips">${chips.join('')}</div>
+    </div>`;
+
   els.baMeta.innerHTML = `
     <div class="ba-summary"><strong>${days}日</strong> でスコア <span class="ba-delta ${tone}">${sign}${sd}</span> 変化</div>
+    ${highlight}
+    <div class="ba-metric-cap">指標ごとの変化（数値が0に近いほど良好）</div>
     <div class="ba-metric-list">${metricRows}</div>
   `;
   els.baStage.scrollIntoView({behavior:'smooth', block:'center'});
@@ -685,11 +877,120 @@ if (els.btnClearHistory){
 }
 // 起動時にも履歴表示を更新(結果未表示でも履歴は残るが、UIは hidden 内なので影響なし)
 document.addEventListener('DOMContentLoaded', () => {
+  ensureProfiles();
+  initProfileUI();
   loadUserPrefs();
   // 保存済プリファレンスをフォームに反映
   applyUserPrefsToForm();
   renderProgress();
 });
+
+// ===== プロフィール (講座生ごとの個人データ) =====
+function renderProfileSelect(){
+  const sel = document.getElementById('profile-select');
+  if (!sel) return;
+  const profs = listProfiles();
+  const activeId = getActiveProfileId();
+  sel.innerHTML = profs.map(p =>
+    `<option value="${p.id}"${p.id === activeId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`
+  ).join('');
+}
+
+// プロフィール切替時: そのプロフィールの設定/履歴を読み込み直す
+function switchProfile(id){
+  setActiveProfileId(id);
+  // フォームを既定値に戻してから保存済みを反映
+  loadUserPrefs();
+  applyUserPrefsToForm();
+  renderProgress();
+  // 既に結果が表示されている場合は隠す(別人のデータと混ざらないように)
+  if (els.results && !els.results.hidden){
+    els.results.hidden = true;
+  }
+  if (els.baStage) els.baStage.hidden = true;
+}
+
+function initProfileUI(){
+  renderProfileSelect();
+  const sel = document.getElementById('profile-select');
+  if (sel) sel.addEventListener('change', e => switchProfile(e.target.value));
+
+  const btnNew = document.getElementById('btn-profile-new');
+  if (btnNew) btnNew.addEventListener('click', () => {
+    const name = prompt('新しいプロフィールの名前を入力してください（例：田中さん／自分用）');
+    if (name === null) return;
+    const prof = createProfile(name);
+    setActiveProfileId(prof.id);
+    renderProfileSelect();
+    switchProfile(prof.id);
+  });
+
+  const btnRename = document.getElementById('btn-profile-rename');
+  if (btnRename) btnRename.addEventListener('click', () => {
+    const cur = getActiveProfile();
+    if (!cur) return;
+    const name = prompt('プロフィール名を変更', cur.name);
+    if (name === null) return;
+    renameProfile(cur.id, name);
+    renderProfileSelect();
+  });
+
+  const btnExport = document.getElementById('btn-profile-export');
+  if (btnExport) btnExport.addEventListener('click', () => {
+    const data = exportActiveProfile();
+    const cur = getActiveProfile();
+    const safeName = (cur?.name || 'profile').replace(/[^\w\u3040-\u30ff\u4e00-\u9faf-]+/g, '_');
+    const stamp = new Date().toISOString().slice(0,10);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `facelab_${safeName}_${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  const btnImport = document.getElementById('btn-profile-import');
+  const importFile = document.getElementById('profile-import-file');
+  if (btnImport && importFile){
+    btnImport.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const obj = JSON.parse(reader.result);
+          const prof = importProfileData(obj);
+          renderProfileSelect();
+          switchProfile(prof.id);
+          alert(`「${prof.name}」として読み込みました。`);
+        } catch(err){
+          alert('読み込みに失敗しました。\n' + (err?.message || err));
+        }
+      };
+      reader.readAsText(file);
+      importFile.value = '';
+    });
+  }
+
+  const btnDelete = document.getElementById('btn-profile-delete');
+  if (btnDelete) btnDelete.addEventListener('click', () => {
+    const profs = listProfiles();
+    const cur = getActiveProfile();
+    if (!cur) return;
+    if (profs.length <= 1){
+      alert('最後のプロフィールは削除できません。新しいプロフィールを作成してから削除してください。');
+      return;
+    }
+    if (!confirm(`プロフィール「${cur.name}」と、その履歴・設定をすべて削除します。この操作は元に戻せません。\n（バックアップ書き出しがお済みでない場合は先に書き出しをおすすめします）`)) return;
+    deleteProfile(cur.id);
+    renderProfileSelect();
+    switchProfile(getActiveProfileId());
+  });
+}
 
 function applyUserPrefsToForm(){
   const setRadio = (name, val) => {
@@ -1073,8 +1374,9 @@ function openExerciseModal(ex){
     ${warningBlock}
     ${contraBlock}
     <div class="modal-section">
-      <h4>🎬 動画ガイド (タイマー付き)</h4>
-      ${buildMotionPlayerHTML(ex.id)}
+      <h4>🎬 やり方イラスト（手順を1コマずつ）</h4>
+      <p class="modal-section-sub">下の絵と言葉のとおりに動かせばOK。番号の順に進めてください。</p>
+      ${buildStepPanelsHTML(ex.id)}
     </div>
     <div class="modal-section">
       <h4>🎯 ターゲット筋</h4>
@@ -1097,9 +1399,19 @@ function openExerciseModal(ex){
     </div>
   `;
   showModal();
-  // 動画ガイドプレイヤー初期化
-  const player = els.modalBody.querySelector('.motion-player');
-  if (player) initMotionPlayer(player, ex.id);
+  // アニメは <details> を開いたとき初回だけ生成・初期化（遅延ロード）
+  const anim = els.modalBody.querySelector('.step-anim');
+  if (anim){
+    anim.addEventListener('toggle', () => {
+      if (!anim.open) return;
+      const mount = anim.querySelector('.step-anim-mount');
+      if (!mount || mount.dataset.ready === '1') return;
+      mount.innerHTML = buildMotionPlayerHTML(ex.id);
+      const player = mount.querySelector('.motion-player');
+      if (player) initMotionPlayer(player, ex.id);
+      mount.dataset.ready = '1';
+    });
+  }
 }
 function openDayModal(d){
   els.modalBody.innerHTML = `

@@ -4,20 +4,24 @@
 // タイムライン表示・Before/After スライダー比較を可能にする。
 // ===================================================================
 
-const STORAGE_KEY = 'facelab.history.v1';
+import { ns, HISTORY_KEY_BASE } from './profiles.js';
+
 const MAX_SNAPSHOTS = 30; // 上限(古いものから自動削除)
+
+// アクティブな講座生プロフィールに紐づく履歴キー
+function storageKey(){ return ns(HISTORY_KEY_BASE); }
 
 // 安全に localStorage を扱う(プライベートブラウズで失敗する環境用)
 function safeRead(){
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) return [];
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? arr : [];
   } catch(e){ return []; }
 }
 function safeWrite(arr){
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
+  try { localStorage.setItem(storageKey(), JSON.stringify(arr)); }
   catch(e){ console.warn('[progress] localStorage write failed', e); }
 }
 
@@ -32,7 +36,7 @@ export function thumbnailFromCanvas(canvas, maxW = 200){
   const tmp = document.createElement('canvas');
   tmp.width = tw; tmp.height = th;
   tmp.getContext('2d').drawImage(canvas, 0, 0, tw, th);
-  try { return tmp.toDataURL('image/jpeg', 0.72); }
+  try { return tmp.toDataURL('image/jpeg', 0.82); }
   catch(e){ return null; }
 }
 
@@ -91,7 +95,7 @@ export function deleteSnapshot(id){
 }
 
 export function clearHistory(){
-  try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+  try { localStorage.removeItem(storageKey()); } catch(e){}
 }
 
 // 2件比較(差分): a が新しい、b が古い → score差・指標差を返す
