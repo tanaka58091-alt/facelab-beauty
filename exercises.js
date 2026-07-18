@@ -640,5 +640,37 @@ export const EXERCISES = {
     cues:{ do:'下から上へ、やさしく引き上げるように', dont:'あご先に力を入れて固めない' },
     why:'口角下がりは「上げる筋肉が弱い」だけでなく「下げる筋肉が張っている」ことも一因。ゆるめると口角が上がりやすくなります。',
   },
+  scalpRelease: {
+    id:'scalpRelease', name:'頭皮ほぐし（生えぎわ〜後頭部）', category:'training', kind:'stretch',
+    duration:'約1分', equipment:'なし', illustration: ICON.relax,
+    purpose:'指の腹で頭皮を動かし、額のシワ・まぶたの重み・引き上げの土台になる頭のこりをゆるめます。',
+    targets:['頭皮','生えぎわ','後頭部'],
+    cues:{ do:'皮ふごと動かす。爪は立てない', dont:'髪を引っぱらない' },
+    why:'顔と頭皮は1枚の皮ふ。頭が硬いと顔が下に引っぱられます。特に後頭部のこりは、まぶたの重さや額のシワの土台になります。',
+  },
+  focusShift: {
+    id:'focusShift', name:'遠近ピント運動（目の疲れ）', category:'training', kind:'training',
+    duration:'約1分', equipment:'なし', illustration: ICON.eye,
+    purpose:'近くと遠くを交互に見て、ピントを合わせる目の筋肉をほぐします。スマホ疲れ・目の重さに。',
+    targets:['目のピント筋','目のまわり'],
+    cues:{ do:'顔は動かさず、目だけでピントを合わせる', dont:'目を細めて無理に見ない' },
+    why:'ピント筋は同じ距離を見続けると固まります。近く⇄遠くをくり返すと、目の疲れとまぶたの重さがやわらぎます。',
+  },
+  acupressure: {
+    id:'acupressure', name:'顔のツボ押し（迎香・四白・攢竹）', category:'training', kind:'stretch',
+    duration:'約1分', equipment:'なし', illustration: ICON.whole,
+    purpose:'小鼻の脇・目の下・眉頭の3つのツボを押して、むくみ・血色・目の疲れをまとめてケアします。',
+    targets:['小鼻の脇','目の下','眉頭'],
+    cues:{ do:'息を吐きながら5秒ずつ、痛気持ちいい強さで', dont:'目の玉を押さない／強く押しすぎない' },
+    why:'顔には巡りに関わるツボが集まっています。位置を覚えれば、手ぶらでいつでも血色・むくみケアができます。',
+  },
+  noseCare: {
+    id:'noseCare', name:'小鼻・鼻まわりほぐし', category:'training', kind:'stretch',
+    duration:'約40秒', equipment:'指', illustration: ICON.relax,
+    purpose:'小鼻の脇をさすり、鼻筋を眉間から小鼻へ流します。ほうれい線の起点と、鼻まわりの血色に。',
+    targets:['小鼻','鼻筋'],
+    cues:{ do:'やさしくさするだけ', dont:'ゴシゴシこすらない' },
+    why:'小鼻の脇はほうれい線の起点。鼻まわりの巡りを上げると、中顔面の血色と軽さが変わります。',
+  },
 
 };

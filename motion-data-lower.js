@@ -331,16 +331,16 @@ export const LOWER_MOTIONS = {
       text:'おつかれさまでした。顔のむくみは最後にここへ流れるので、仕上げにおすすめです 🌷', overlay:'' },
   ]},
 
-  shoulderRoll: { name:'肩を大きくまわす', reps:'前後 各5回', duration:24, steps:[
+  shoulderRoll: { name:'肩を大きくまわす', reps:'前後 各5回', duration:24, base:'body', steps:[
     { label:'指先を肩に乗せる', cue:'座って、指先を両肩に軽く乗せる',
       text:'座って背すじを伸ばし、指先を両肩に軽く乗せる',
-      overlay: hand(60,226)+hand(140,226)+target(100,228,6,'肩') },
+      overlay: hand(52,110)+hand(148,110)+target(52,110,6,'肩')+target(148,110,6) },
     { label:'後ろへまわす', cue:'ひじで大きな円を描くように、後ろへ', count:'5回',
       text:'ひじで大きな円を描くように、後ろへゆっくり5回まわす',
-      overlay: hand(60,222)+hand(140,222)+arrowPath('M66 232 Q52 214 72 210 Q86 218 78 230') },
+      overlay: hand(52,110)+hand(148,110)+arrowPath('M62 124 Q40 106 60 98 Q80 108 68 124')+arrowPath('M138 124 Q160 106 140 98 Q120 108 132 124') },
     { label:'前へまわす', cue:'今度は前へ5回', count:'5回',
       text:'今度は前へ、ゆっくり5回まわす',
-      overlay: hand(60,222)+hand(140,222)+arrowPath('M134 232 Q148 214 128 210 Q114 218 122 230') },
+      overlay: hand(52,110)+hand(148,110)+arrowPath('M68 124 Q40 116 52 98 Q72 104 62 122') },
     { label:'完了', cue:'肩が下がると顔も軽くなる 🌷',
       text:'おつかれさまでした。肩が下がると、首も顔も軽くなります 🌷', overlay:'' },
   ]},

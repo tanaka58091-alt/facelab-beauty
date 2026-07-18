@@ -10,21 +10,21 @@
 export const PRESCRIPTION_MAP = {
   facialAsymmetry: { training: ['symmetrySmile','oneSideRelease','oneSideSmile','browSolo','chopstickTrain','mouthCornerLift','fullFlow','postureFace','aiueoTrain','balloonFace','tongueStretch'] },
   mouthCornerDown: { training: ['mouthCornerLift','cornerDepressorRelease','mouthCornerTongue','chopstickTrain','cheekLift','smileHold','aiueoTrain','beakPose','fullFlow','lipPucker'] },
-  nasolabialFold:  { training: ['nasolabialStretch','cheekLiftAssist','balloonFace','cheekLift','tongueRoll','chinUpPose','mouthCornerTongue','upperLipTrain','cheekPump','fishFace'] },
+  nasolabialFold:  { training: ['nasolabialStretch','cheekLiftAssist','balloonFace','cheekLift','tongueRoll','noseCare','chinUpPose','mouthCornerTongue','upperLipTrain','cheekPump','fishFace'] },
   jawSagging:      { training: ['chinTuck','chinPress','neckFront','faceLymphDrain','octopusPose','jawSlide','tonguePress','swallowTrain','chinMassage','neckIso','beakPose'] },
-  puffiness:       { training: ['faceLymphDrain','tongueOut','earYoga','cheekPump','cheekAir','clavicleLymph','neckMassage','faceMassage','breathGlow','bloodFlowPose','munchFace','chinMassage'] },
+  puffiness:       { training: ['faceLymphDrain','tongueOut','earYoga','acupressure','cheekPump','cheekAir','clavicleLymph','neckMassage','faceMassage','breathGlow','bloodFlowPose','munchFace','chinMassage'] },
   partsBalance:    { training: ['fullFlow','freshFacePose','browRaise','eyeWideOpen','cheekLift','mouthCornerLift','symmetrySmile','aiueoTrain','smileHold'] },
   masseterHypertrophy: { training: ['masseterRelease','oneSideRelease','masseterTap','masseterStretch','templeRelease','earYoga','mouthOpen','jawSlide','faceRelax','neckSide'] },
   cheekHollow:     { training: ['cheekPump','balloonFace','cheekAir','cheekLift','cheekLiftAssist','tongueRoll','nasolabialStretch','cheekBoneMassage'] },
   longPhiltrum:    { training: ['upperLipTrain','lipPucker','bigO','mouthCornerTongue','aiueoTrain','cheekLift','lipOpenClose'] },
   gummySmile:      { training: ['upperLipTrain','mouthCornerLift','lipPucker','smileHold','symmetrySmile','cheekLift','aiueoTrain'] },
-  hoodedEyelid:    { training: ['eyeWideOpen','binocularPose','browRaise','foreheadSmooth','hairlineLift','eyeRelease','lowerLidLift','blinkReset'] },
+  hoodedEyelid:    { training: ['eyeWideOpen','binocularPose','browRaise','scalpRelease','focusShift','foreheadSmooth','hairlineLift','eyeRelease','lowerLidLift','blinkReset'] },
   droopyEyeOuter:  { training: ['outerEyeLift','binocularPose','eyeWideOpen','lowerLidLift','browRaise','eyeRelease','symmetrySmile'] },
   longLowerFace:   { training: ['chinTuck','tonguePress','neckFront','chinPress','octopusPose','postureFace','mouthOpen','faceRelax'] },
-  templeHollow:    { training: ['templeRelease','earYoga','oneSideRelease','masseterRelease','browRaise','foreheadSmooth','faceMassage','faceRelax','hairlineLift'] },
-  foreheadLines:   { training: ['foreheadSmooth','hairlineLift','browUpDown','browRaise','glabellaRelease','faceRelax','diaphragmBreath','templeRelease'] },
-  glabellarLines:  { training: ['glabellaRelease','browUpDown','foreheadSmooth','faceRelax','diaphragmBreath','breathGlow','eyeRelease','templeRelease'] },
-  general:         { training: ['fullFlow','cheekLift','mouthCornerLift','tongueRoll','aiueoTrain','chinTuck','browRaise','earYoga','faceLymphDrain','breathGlow','faceRelax','postureFace','smileHold','neckFront'] },
+  templeHollow:    { training: ['templeRelease','earYoga','oneSideRelease','scalpRelease','masseterRelease','browRaise','foreheadSmooth','faceMassage','faceRelax','hairlineLift'] },
+  foreheadLines:   { training: ['foreheadSmooth','hairlineLift','scalpRelease','browUpDown','browRaise','glabellaRelease','faceRelax','diaphragmBreath','templeRelease'] },
+  glabellarLines:  { training: ['glabellaRelease','browUpDown','foreheadSmooth','scalpRelease','faceRelax','diaphragmBreath','breathGlow','eyeRelease','templeRelease'] },
+  general:         { training: ['fullFlow','cheekLift','mouthCornerLift','tongueRoll','aiueoTrain','chinTuck','browRaise','earYoga','faceLymphDrain','acupressure','scalpRelease','breathGlow','faceRelax','postureFace','smileHold','neckFront'] },
 };
 
 // zone: upper(額・目・眉) / mid(頬・鼻・口輪) / lower(口角・あご・首)
@@ -112,6 +112,10 @@ export const EXERCISE_META = {
   oneSideRelease:   { zone:'lower', intensity:'light',  tier:2 },
   faceLymphDrain:   { zone:'mid',   intensity:'light',  tier:1 },
   cornerDepressorRelease: { zone:'lower', intensity:'light', tier:2 },
+  scalpRelease:     { zone:'upper', intensity:'light',  tier:1 },
+  focusShift:       { zone:'upper', intensity:'light',  tier:2 },
+  acupressure:      { zone:'mid',   intensity:'light',  tier:2 },
+  noseCare:         { zone:'mid',   intensity:'light',  tier:2 },
 };
 
 export const CONTRA_LABEL = {
@@ -201,6 +205,10 @@ export const EXERCISE_META_EXT = {
   oneSideRelease:         { tools:['fingers'], contra:['skinSensitive'] },
   faceLymphDrain:         { tools:['fingers'], contra:['skinSensitive'] },
   cornerDepressorRelease: { tools:['fingers'], contra:['skinSensitive'] },
+  scalpRelease:           { tools:['none'] },
+  focusShift:             { tools:['none'] },
+  acupressure:            { tools:['none'], contra:['glaucoma'] },
+  noseCare:               { tools:['fingers'], contra:['skinSensitive'] },
 };
 
 export function getMeta(id){

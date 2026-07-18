@@ -12,7 +12,7 @@
 //
 // ★id重複バグ対策: <defs> は MOTION_DEFS としてモーダルに1回だけ挿入（app.js）
 // ===================================================================
-import { MOTION_DEFS, FACE_BODY } from './motion-helpers.js';
+import { MOTION_DEFS, FACE_BODY, UPPER_BODY } from './motion-helpers.js';
 import { UPPER_MOTIONS } from './motion-data-upper.js';
 import { MID_MOTIONS }   from './motion-data-mid.js';
 import { LOWER_MOTIONS } from './motion-data-lower.js';
@@ -50,6 +50,7 @@ export function buildHowListHTML(exerciseId){
 // ===================================================================
 export function buildStepPanelsHTML(exerciseId){
   const m = getMotion(exerciseId);
+  const baseBody = m.base === 'body' ? UPPER_BODY : FACE_BODY;
   const panels = m.steps.map((s, i) => {
     const overlay = s.overlay || '';
     const isDone = !overlay.trim();
@@ -58,7 +59,7 @@ export function buildStepPanelsHTML(exerciseId){
         <div class="step-panel-num">${i + 1}</div>
         <div class="step-panel-stage">
           <svg viewBox="0 0 200 230" class="step-panel-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${(s.label || '').replace(/"/g,'')}">
-            ${FACE_BODY}
+            ${baseBody}
             <g class="step-panel-overlay">${overlay}</g>
           </svg>
         </div>
@@ -93,11 +94,12 @@ export function buildStepPanelsHTML(exerciseId){
 
 export function buildMotionPlayerHTML(exerciseId){
   const m = getMotion(exerciseId);
+  const baseBody = m.base === 'body' ? UPPER_BODY : FACE_BODY;
   return `
     <div class="motion-player" data-pattern="${exerciseId}" data-duration="${m.duration}">
       <div class="motion-stage">
         <svg viewBox="0 0 200 230" class="motion-svg" preserveAspectRatio="xMidYMid meet">
-          ${FACE_BODY}
+          ${baseBody}
           <g class="motion-overlay"></g>
         </svg>
         <div class="motion-badge">

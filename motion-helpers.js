@@ -35,6 +35,20 @@ export const FACE_BODY = `
 <path d="M75 196 Q100 208 125 196" stroke="#E07A8A" stroke-width="1.5" fill="none" opacity="0.6"/>
 `;
 
+// 上半身ベース（姿勢・呼吸・肩など、顔だけでは動きが伝わらない種目用）
+//   座標の目安（viewBox 0 0 200 230）
+//   頭のてっぺん100,17 ／ 目90/110,46 ／ あご100,75 ／ 肩52/148,110
+//   胸100,135 ／ お腹(へそ)100,170 ／ 坐骨(お尻の骨)100,216
+export const UPPER_BODY = `
+<path d="M74 40 Q76 15 100 14 Q124 15 126 40 Q114 33 100 33 Q86 33 74 40 Z" fill="#5B3F47"/>
+<ellipse cx="100" cy="46" rx="25" ry="29" fill="url(#mfaceg)" stroke="#E07A8A" stroke-width="2"/>
+<circle cx="90" cy="46" r="2.4" fill="#3D2A2F"/><circle cx="110" cy="46" r="2.4" fill="#3D2A2F"/>
+<path d="M92 58 Q100 62 108 58" stroke="#E07A8A" stroke-width="2" fill="none" stroke-linecap="round"/>
+<path d="M90 72 L90 90 Q100 96 110 90 L110 72 Z" fill="#FFD9E0"/>
+<path d="M38 112 Q60 96 100 95 Q140 96 162 112 Q170 130 172 230 L28 230 Q30 130 38 112 Z" fill="#FCE7EC" stroke="#E9A6B4" stroke-width="1.6"/>
+<line x1="100" y1="96" x2="100" y2="220" stroke="#E9A6B4" stroke-width="1.3" stroke-dasharray="5 5" opacity="0.75"/>
+`;
+
 // 動かす場所（ピンクの●）
 export const target = (cx, cy, r=8, label='') => `
   <g class="mv-target">

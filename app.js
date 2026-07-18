@@ -72,29 +72,66 @@ const els = {
   baMeta: $('#ba-meta'),
 };
 
-// 優先チップ: ダブルクリックで is-priority トグル(最大3つ)
+// 優先チップ: ⭐トグルボタン(スマホ対応)＋ダブルクリック(PC補助)で is-priority(最大3つ)
 document.addEventListener('DOMContentLoaded', () => {
   const chipsRoot = document.getElementById('symptom-chips');
   if (!chipsRoot) return;
-  chipsRoot.addEventListener('dblclick', (e) => {
-    const lbl = e.target.closest('label.chip');
-    if (!lbl) return;
+
+  function refreshStar(lbl){
+    const star = lbl.querySelector('.chip-star');
+    if (!star) return;
+    const p = lbl.classList.contains('is-priority');
+    star.textContent = p ? '⭐' : '☆';
+    star.classList.toggle('on', p);
+    star.setAttribute('aria-pressed', p ? 'true' : 'false');
+  }
+  function togglePriority(lbl){
     const cb = lbl.querySelector('input[type="checkbox"]');
     if (!cb) return;
-    // 優先化はチェックが入っているもののみ
-    if (!cb.checked) cb.checked = true;
     if (lbl.classList.contains('is-priority')){
       lbl.classList.remove('is-priority');
     } else {
-      const current = chipsRoot.querySelectorAll('label.chip.is-priority').length;
-      if (current >= 3){
-        // 一番古い優先(=最初の要素)を外す
-        const first = chipsRoot.querySelector('label.chip.is-priority');
-        first?.classList.remove('is-priority');
-      }
+      if (!cb.checked) cb.checked = true; // 優先にするなら選択も入れる
+      const cur = chipsRoot.querySelectorAll('label.chip.is-priority');
+      if (cur.length >= 3){ cur[0].classList.remove('is-priority'); refreshStar(cur[0]); } // 一番古い優先を外す
       lbl.classList.add('is-priority');
     }
+    refreshStar(lbl);
+  }
+
+  // 各チップに ⭐ トグルボタンを付与（スマホのタップでも優先設定できる）
+  chipsRoot.querySelectorAll('label.chip').forEach(lbl => {
+    if (lbl.querySelector('.chip-star')) return;
+    const star = document.createElement('button');
+    star.type = 'button';
+    star.className = 'chip-star';
+    star.textContent = '☆';
+    star.setAttribute('aria-label', '特に気になる（優先）に設定');
+    star.setAttribute('aria-pressed', 'false');
+    lbl.appendChild(star);
+  });
+
+  // ⭐ボタンのタップ
+  chipsRoot.addEventListener('click', (e) => {
+    const star = e.target.closest('.chip-star');
+    if (!star) return;
+    e.preventDefault(); e.stopPropagation(); // ラベルのチェック切替を止める
+    const lbl = star.closest('label.chip');
+    if (lbl) togglePriority(lbl);
+  });
+  // 選択を外したら優先も解除
+  chipsRoot.addEventListener('change', (e) => {
+    const cb = e.target.closest('input[type="checkbox"]');
+    if (!cb || cb.checked) return;
+    const lbl = cb.closest('label.chip');
+    if (lbl && lbl.classList.contains('is-priority')){ lbl.classList.remove('is-priority'); refreshStar(lbl); }
+  });
+  // PC向けにダブルクリックも残す
+  chipsRoot.addEventListener('dblclick', (e) => {
+    const lbl = e.target.closest('label.chip');
+    if (!lbl) return;
     e.preventDefault();
+    togglePriority(lbl);
   });
 });
 
@@ -386,26 +423,33 @@ function collectSymptoms(){
 // ===================================================================
 async function loadLandmarker(){
   if (state.landmarker) return state.landmarker;
-  setLoader('MediaPipe Visionモデルを読み込んでいます…');
-  const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
-  const fileset = await vision.FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm'
-  );
-  setLoader('顔ランドマーク推定モデル(468点)を初期化中…');
-  state.landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-    baseOptions: {
-      modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-      delegate: 'GPU',
-    },
-    runningMode: 'IMAGE',
-    numFaces: 1,
-    minFaceDetectionConfidence: 0.5,
-    minFacePresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5,
-    outputFacialTransformationMatrixes: false,
-    outputFaceBlendshapes: false,
-  });
-  return state.landmarker;
+  try {
+    setLoader('AIモデルを読み込んでいます…（初回は10〜20秒ほどかかります）');
+    const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
+    const fileset = await vision.FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm'
+    );
+    setLoader('顔ランドマーク推定モデル(468点)を初期化中…');
+    state.landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+        delegate: 'GPU',
+      },
+      runningMode: 'IMAGE',
+      numFaces: 1,
+      minFaceDetectionConfidence: 0.5,
+      minFacePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+      outputFacialTransformationMatrixes: false,
+      outputFaceBlendshapes: false,
+    });
+    return state.landmarker;
+  } catch (e){
+    // 通信不良・CDN制限・オフライン等でモデル取得に失敗
+    const err = new Error('MODEL_LOAD_FAILED');
+    err.cause = e;
+    throw err;
+  }
 }
 
 async function detectFace(image){
@@ -500,8 +544,12 @@ els.btnAnalyze.addEventListener('click', async () => {
 
   } catch (e){
     console.error(e);
-    alert('解析中にエラーが発生しました。\n\n' + e.message);
-    hideLoader();
+    if (e && e.message === 'MODEL_LOAD_FAILED'){
+      alert('AIモデルの読み込みに失敗しました。\n\n通信環境（Wi-Fi・モバイル回線）をご確認のうえ、もう一度「顔を解析する」を押してください。社内ネットワーク等で通信が制限されている場合は、別の回線でお試しください。');
+    } else {
+      alert('解析中にエラーが発生しました。もう一度お試しください。\n\n' + (e && e.message ? e.message : ''));
+    }
+    hideLoader(); // ボタンを再度押せる状態に戻す（＝再試行できる）
   }
 });
 
@@ -682,7 +730,7 @@ function progressItemHTML(s, i, total){
         <div class="progress-date">${dateStr}</div>
         <div class="progress-type">${s.faceType ?? ''}</div>
       </div>
-      <button class="progress-del" data-id="${s.id}" title="削除">×</button>
+      <button class="progress-del" data-id="${s.id}" title="削除" aria-label="この履歴を削除">×</button>
     </div>
   `;
 }
@@ -915,9 +963,11 @@ function initProfileUI(){
   if (sel) sel.addEventListener('change', e => switchProfile(e.target.value));
 
   const btnNew = document.getElementById('btn-profile-new');
-  if (btnNew) btnNew.addEventListener('click', () => {
-    const name = prompt('新しいプロフィールの名前を入力してください（例：田中さん／自分用）');
+  if (btnNew) btnNew.addEventListener('click', async () => {
+    const name = await uiPrompt({ title:'新しいプロフィール', label:'名前を入力してください（例：田中さん／自分用）', placeholder:'名前', okText:'作成' });
     if (name === null) return;
+    if (!name.trim()){ await uiAlert({ title:'名前が空です', message:'プロフィール名を入力してください。' }); return; }
+    if (listProfiles().some(p => p.name === name.trim())){ await uiAlert({ title:'同じ名前があります', message:'別の名前を入力してください。' }); return; }
     const prof = createProfile(name);
     setActiveProfileId(prof.id);
     renderProfileSelect();
@@ -925,11 +975,13 @@ function initProfileUI(){
   });
 
   const btnRename = document.getElementById('btn-profile-rename');
-  if (btnRename) btnRename.addEventListener('click', () => {
+  if (btnRename) btnRename.addEventListener('click', async () => {
     const cur = getActiveProfile();
     if (!cur) return;
-    const name = prompt('プロフィール名を変更', cur.name);
+    const name = await uiPrompt({ title:'名前を変更', label:'新しいプロフィール名', value:cur.name, okText:'変更' });
     if (name === null) return;
+    if (!name.trim()){ await uiAlert({ title:'名前が空です', message:'プロフィール名を入力してください。' }); return; }
+    if (listProfiles().some(p => p.name === name.trim() && p.id !== cur.id)){ await uiAlert({ title:'同じ名前があります', message:'別の名前を入力してください。' }); return; }
     renameProfile(cur.id, name);
     renderProfileSelect();
   });
@@ -965,9 +1017,9 @@ function initProfileUI(){
           const prof = importProfileData(obj);
           renderProfileSelect();
           switchProfile(prof.id);
-          alert(`「${prof.name}」として読み込みました。`);
+          uiAlert({ title:'読み込み完了', message:`「${escapeHtml(prof.name)}」として読み込みました。` });
         } catch(err){
-          alert('読み込みに失敗しました。\n' + (err?.message || err));
+          uiAlert({ title:'読み込みに失敗しました', message: escapeHtml(err?.message || String(err)) });
         }
       };
       reader.readAsText(file);
@@ -976,15 +1028,20 @@ function initProfileUI(){
   }
 
   const btnDelete = document.getElementById('btn-profile-delete');
-  if (btnDelete) btnDelete.addEventListener('click', () => {
+  if (btnDelete) btnDelete.addEventListener('click', async () => {
     const profs = listProfiles();
     const cur = getActiveProfile();
     if (!cur) return;
     if (profs.length <= 1){
-      alert('最後のプロフィールは削除できません。新しいプロフィールを作成してから削除してください。');
+      await uiAlert({ title:'削除できません', message:'最後のプロフィールは削除できません。新しいプロフィールを作成してから削除してください。' });
       return;
     }
-    if (!confirm(`プロフィール「${cur.name}」と、その履歴・設定をすべて削除します。この操作は元に戻せません。\n（バックアップ書き出しがお済みでない場合は先に書き出しをおすすめします）`)) return;
+    const ok = await uiConfirm({
+      title:'プロフィールを削除',
+      message:`プロフィール「${escapeHtml(cur.name)}」と、その履歴・設定をすべて削除します。<br>この操作は元に戻せません。<br><small>（バックアップ書き出しがお済みでない場合は、先に書き出しをおすすめします）</small>`,
+      okText:'削除する', danger:true,
+    });
+    if (!ok) return;
     deleteProfile(cur.id);
     renderProfileSelect();
     switchProfile(getActiveProfileId());
@@ -1175,6 +1232,30 @@ function labelTag(ctx, p, text){
 }
 
 // ===== Problems =====
+// 筋肉名 → 一般人にわかる場所の言葉（技術名は小さく併記）
+const MUSCLE_GLOSS = {
+  '咬筋':'エラ（噛む筋肉）', '側頭筋膜':'こめかみ', '側頭筋':'こめかみ', '広頸筋':'首の前',
+  '胸鎖乳突筋':'首の横すじ', '内側翼突筋':'奥の噛む筋肉', '後頭下筋群':'後頭部の付け根',
+  '口角挙筋':'口角を上げる筋肉', '大頬骨筋':'ほおを上げる筋肉', '小頬骨筋':'ほおの内側',
+  '頬筋':'ほおの奥', '口角下制筋':'口角を下げる筋肉', '下唇下制筋':'下唇を下げる筋肉',
+  'オトガイ筋':'あご先', '上唇鼻翼挙筋':'小鼻〜上唇', '上唇挙筋':'上唇を上げる筋肉',
+  '舌骨上筋群':'あご下', '顎二腹筋':'あご下', '前頭筋外側':'おでこの外側', '前頭筋中央':'おでこ中央',
+  '前頭筋':'おでこ', '上眼瞼挙筋':'まぶたを上げる筋肉', '眼瞼挙筋':'まぶたを上げる筋肉',
+  '皺眉筋':'眉間', '鼻根筋':'鼻の付け根', '眼輪筋外側部':'目尻', '眼輪筋外側':'目尻',
+  '眼輪筋上部':'目の上ふち', '眼輪筋':'目のまわり', '口輪筋上部':'口のまわり（上）',
+  '口輪筋下部':'口のまわり（下）', '口輪筋':'口のまわり', '舌筋':'舌', '舌':'舌',
+};
+const MUSCLE_KEYS = Object.keys(MUSCLE_GLOSS).sort((a,b)=>b.length-a.length); // 長い名前を先に照合
+function glossMuscle(raw){
+  for (const key of MUSCLE_KEYS){
+    if (raw.startsWith(key)){
+      const suffix = raw.slice(key.length); // (片側)(反対側) 等
+      return `${MUSCLE_GLOSS[key]}${suffix}<small class="tissue-tech">${raw}</small>`;
+    }
+  }
+  return raw;
+}
+
 function renderProblems(){
   els.problemsList.innerHTML = state.problems.map(p => {
     const sevText = p.severity === 'high' ? '重' : p.severity === 'mid' ? '中' : '軽';
@@ -1193,12 +1274,12 @@ function renderProblems(){
           <div class="problem-desc">${p.description}</div>
           <div class="tissue-list">
             <div class="tissue tight">
-              <strong>🔴 短縮 / 過緊張</strong>
-              <ul>${p.tissues.tight.map(t=>`<li>${t}</li>`).join('') || '<li>—</li>'}</ul>
+              <strong>🔴 こわばっている所（ゆるめる）</strong>
+              <ul>${p.tissues.tight.map(t=>`<li>${glossMuscle(t)}</li>`).join('') || '<li>—</li>'}</ul>
             </div>
             <div class="tissue weak">
-              <strong>🟡 弱化 / 機能低下</strong>
-              <ul>${p.tissues.weak.map(t=>`<li>${t}</li>`).join('') || '<li>—</li>'}</ul>
+              <strong>🟡 使えていない所（鍛える）</strong>
+              <ul>${p.tissues.weak.map(t=>`<li>${glossMuscle(t)}</li>`).join('') || '<li>—</li>'}</ul>
             </div>
           </div>
         </div>
@@ -1499,12 +1580,106 @@ function openDayModal(d){
   showModal();
 }
 function showModal(){ els.modal.hidden = false; document.body.style.overflow = 'hidden'; }
-function closeModal(){ els.modal.hidden = true; document.body.style.overflow = ''; }
+function closeModal(){ els.modal.hidden = true; document.body.style.overflow = ''; settleDialog(DIALOG_CANCEL); }
 els.modal.addEventListener('click', e => { if (e.target.matches('[data-close]')) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key==='Escape' && !els.modal.hidden) closeModal(); });
+
+// ===== アプリ内ダイアログ（ネイティブ prompt/confirm/alert の置き換え） =====
+const DIALOG_CANCEL = Symbol('cancel');
+let _dialogResolve = null;
+function settleDialog(val){ if (_dialogResolve){ const r = _dialogResolve; _dialogResolve = null; r(val); } }
+function uiPrompt({ title, label='', value='', placeholder='', okText='決定' }){
+  return new Promise(resolve => {
+    _dialogResolve = (v) => resolve(v === DIALOG_CANCEL ? null : v);
+    els.modalBody.innerHTML = `
+      <div class="ui-dialog">
+        <h3>${escapeHtml(title)}</h3>
+        ${label ? `<label class="ui-dialog-label" for="ui-dialog-input">${escapeHtml(label)}</label>` : ''}
+        <input type="text" class="ui-dialog-input" id="ui-dialog-input" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" />
+        <div class="ui-dialog-actions">
+          <button class="btn-ghost" id="ui-cancel" type="button">キャンセル</button>
+          <button class="btn-primary" id="ui-ok" type="button">${escapeHtml(okText)}</button>
+        </div>
+      </div>`;
+    showModal();
+    const input = document.getElementById('ui-dialog-input');
+    setTimeout(() => { input.focus(); input.select(); }, 30);
+    const ok = () => { const v = input.value; settleDialog(v); closeModal(); };
+    document.getElementById('ui-ok').addEventListener('click', ok);
+    document.getElementById('ui-cancel').addEventListener('click', () => closeModal());
+    input.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); ok(); } });
+  });
+}
+function uiConfirm({ title, message, okText='実行', danger=false }){
+  return new Promise(resolve => {
+    _dialogResolve = (v) => resolve(v === true);
+    els.modalBody.innerHTML = `
+      <div class="ui-dialog">
+        <h3>${escapeHtml(title)}</h3>
+        <p class="ui-dialog-msg">${message}</p>
+        <div class="ui-dialog-actions">
+          <button class="btn-ghost" id="ui-cancel" type="button">キャンセル</button>
+          <button class="btn-primary${danger ? ' danger' : ''}" id="ui-ok" type="button">${escapeHtml(okText)}</button>
+        </div>
+      </div>`;
+    showModal();
+    document.getElementById('ui-ok').addEventListener('click', () => { settleDialog(true); closeModal(); });
+    document.getElementById('ui-cancel').addEventListener('click', () => closeModal());
+  });
+}
+function uiAlert({ title, message }){
+  return new Promise(resolve => {
+    _dialogResolve = () => resolve();
+    els.modalBody.innerHTML = `
+      <div class="ui-dialog">
+        <h3>${escapeHtml(title)}</h3>
+        <p class="ui-dialog-msg">${message}</p>
+        <div class="ui-dialog-actions">
+          <button class="btn-primary" id="ui-ok" type="button">OK</button>
+        </div>
+      </div>`;
+    showModal();
+    document.getElementById('ui-ok').addEventListener('click', () => { settleDialog(); closeModal(); });
+  });
+}
 
 els.btnRestart.addEventListener('click', () => {
   els.results.hidden = true;
   document.getElementById('upload-section').scrollIntoView({behavior:'smooth'});
 });
 els.btnPrint.addEventListener('click', () => window.print());
+
+// ===== 法的情報モーダル（プライバシー/利用規約/免責） =====
+const LEGAL = {
+  privacy: { title:'プライバシーポリシー', body:`
+    <p>本ツールは、あなたのプライバシーを最優先に設計しています。</p>
+    <ul>
+      <li><strong>顔写真</strong>は、お使いのブラウザの中だけで解析され、<strong>外部のサーバーには一切送信されません</strong>。</li>
+      <li>診断の履歴・設定・プロフィールは、この端末の中（ブラウザのローカルストレージ）にのみ保存されます。</li>
+      <li>年代・既往症・生活習慣などの入力は、<strong>あなた専用メニューの最適化のためだけ</strong>に使われ、外部に共有されません。</li>
+      <li>データが端末の外に出るのは、あなたが自分で「バックアップ」を書き出したときだけです。</li>
+      <li>履歴の消去・プロフィールの削除は、いつでもご自身で行えます。</li>
+    </ul>` },
+  terms: { title:'利用規約', body:`
+    <ul>
+      <li>本ツールは、表情筋のセルフケアを目的とした<strong>参考情報</strong>を提供するものです。</li>
+      <li>体調不良・痛み・違和感があるときは、無理をせず中止してください。</li>
+      <li>顎関節症・緑内障・高血圧・首の不調・妊娠中などに該当する方は、事前に医師にご相談ください（該当する種目は自動で除外されます）。</li>
+      <li>本ツールの利用は自己責任でお願いします。</li>
+    </ul>` },
+  disclaimer: { title:'免責事項', body:`
+    <ul>
+      <li>本ツールは教育・セルフケア目的の参考情報であり、<strong>医師・美容医療従事者による診断・治療を代替するものではありません</strong>。</li>
+      <li>診断結果・スコアはあくまで目安であり、医学的な判断を示すものではありません。</li>
+      <li>感じ方・変化には個人差があります。</li>
+      <li>本ツールの利用によって生じたいかなる結果についても、開発者は責任を負いかねます。</li>
+    </ul>` },
+};
+function openLegalModal(kind){
+  const l = LEGAL[kind]; if (!l) return;
+  els.modalBody.innerHTML = `<div class="legal-modal"><h2>${l.title}</h2>${l.body}<p class="legal-updated">最終更新: 2026年7月</p></div>`;
+  showModal();
+}
+document.querySelectorAll('.foot-link').forEach(b => {
+  b.addEventListener('click', () => openLegalModal(b.dataset.legal));
+});
