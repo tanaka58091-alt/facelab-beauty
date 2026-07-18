@@ -141,3 +141,85 @@ export function importProfileData(obj){
   setActiveProfileId(prof.id);
   return prof;
 }
+
+// ===================================================================
+// メール式サインイン（静的サイト版）
+//   ・メールアドレスを「アカウントの識別名」として使い、データをそのアカウントの
+//     名前空間(=email由来の安定id)に保存する。他人のアカウント一覧は表示しない。
+//   ・任意の PIN を設定すると、その端末で開くときにPINロックがかかる(共有端末対策)。
+//   ※ サーバー無しのため「認証」ではなく「その端末内での本人識別＋簡易ロック」。
+//     データは端末内のみで、別の端末へは同期されない。
+// ===================================================================
+const SIGNIN_KEY = 'facelab.signedIn.v1';
+
+export function normalizeEmail(e){ return (e || '').trim().toLowerCase(); }
+export function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(e)); }
+function hashStr(s){ let h = 5381; for (let i=0;i<s.length;i++){ h = ((h<<5)+h + s.charCodeAt(i)) >>> 0; } return h.toString(36); }
+
+export function findAccountByEmail(email){
+  const n = normalizeEmail(email);
+  return listProfiles().find(p => p.email && normalizeEmail(p.email) === n) || null;
+}
+
+// メールでサインイン(無ければ作成)。active/signedIn をセット。
+export function signInWithEmail(email, name){
+  const n = normalizeEmail(email);
+  let acc = findAccountByEmail(n);
+  let isNew = false;
+  if (!acc){
+    const arr = listProfiles();
+    acc = { id: 'a_' + hashStr(n), email: n, name: (name || '').trim() || n.split('@')[0], createdAt: new Date().toISOString() };
+    arr.push(acc); persistProfiles(arr); isNew = true;
+  }
+  setActiveProfileId(acc.id);
+  try { localStorage.setItem(SIGNIN_KEY, acc.id); } catch(e){}
+  return { account: acc, isNew };
+}
+
+export function accountHasPin(id){ const p = listProfiles().find(x => x.id === id); return !!(p && p.pinHash); }
+export function setAccountPin(id, pin){
+  const arr = listProfiles(); const p = arr.find(x => x.id === id); if (!p) return;
+  if (pin){ p.pinHash = hashStr('pin:' + pin); } else { delete p.pinHash; }
+  persistProfiles(arr);
+}
+export function verifyAccountPin(id, pin){
+  const p = listProfiles().find(x => x.id === id);
+  return !!(p && p.pinHash && p.pinHash === hashStr('pin:' + pin));
+}
+
+export function getSignedInId(){ try { return localStorage.getItem(SIGNIN_KEY); } catch(e){ return null; } }
+export function isSignedIn(){ const id = getSignedInId(); return !!(id && listProfiles().find(p => p.id === id)); }
+export function getCurrentAccount(){ const id = getSignedInId(); return listProfiles().find(p => p.id === id) || null; }
+export function signOut(){ try { localStorage.removeItem(SIGNIN_KEY); } catch(e){} }
+
+// バックアップ書き出しにメール等も含める
+export function exportActiveAccount(){
+  const id = getSignedInId() || getActiveProfileId();
+  const prof = listProfiles().find(p => p.id === id) || null;
+  return {
+    app: 'facelab', kind: 'profileBackup', version: 2,
+    exportedAt: new Date().toISOString(),
+    profile: prof,
+    history: safeRead(`${HISTORY_BASE}::${id}`, []),
+    prefs:   safeRead(`${PREFS_BASE}::${id}`, null),
+    journey: safeRead(`facelab.journey.v1::${id}`, null),
+    lastSession: safeRead(`facelab.lastSession.v1::${id}`, null),
+  };
+}
+
+// バックアップを「今サインイン中のアカウント」に取り込む(別プロフィールは作らない)
+export function importIntoActiveAccount(obj){
+  if (!obj || obj.kind !== 'profileBackup'){
+    throw new Error('FaceLab のバックアップファイルではありません。');
+  }
+  const id = getSignedInId() || rawActiveId();
+  if (!id) throw new Error('アカウントが選択されていません。');
+  const cleanHistory = Array.isArray(obj.history)
+    ? obj.history.filter(x => x && typeof x === 'object' && typeof x.id === 'string' && x.createdAt)
+    : [];
+  safeWrite(`${HISTORY_BASE}::${id}`, cleanHistory);
+  if (obj.prefs && typeof obj.prefs === 'object')       safeWrite(`${PREFS_BASE}::${id}`, obj.prefs);
+  if (obj.journey && typeof obj.journey === 'object')   safeWrite(`facelab.journey.v1::${id}`, obj.journey);
+  if (obj.lastSession && typeof obj.lastSession==='object') safeWrite(`facelab.lastSession.v1::${id}`, obj.lastSession);
+  return true;
+}

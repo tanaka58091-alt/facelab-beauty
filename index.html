@@ -11,6 +11,24 @@
 </head>
 <body>
 
+<!-- ============ サインイン・ゲート（メール式） ============ -->
+<div class="signin-gate" id="signin-gate" hidden>
+  <div class="signin-card">
+    <div class="signin-brand">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+        <ellipse cx="24" cy="14" rx="6" ry="9" fill="#FFB7C5"/>
+        <ellipse cx="32" cy="20" rx="6" ry="9" fill="#FFC9D6" transform="rotate(72 32 20)"/>
+        <ellipse cx="30" cy="30" rx="6" ry="9" fill="#FFB7C5" transform="rotate(144 30 30)"/>
+        <ellipse cx="18" cy="30" rx="6" ry="9" fill="#FFC9D6" transform="rotate(216 18 30)"/>
+        <ellipse cx="16" cy="20" rx="6" ry="9" fill="#FFB7C5" transform="rotate(288 16 20)"/>
+        <circle cx="24" cy="22" r="3" fill="#FFD93D"/>
+      </svg>
+      <div class="signin-brand-text"><span class="brand-name">FaceLab</span> <span class="brand-script">Beauty.</span></div>
+    </div>
+    <div id="signin-body"></div>
+  </div>
+</div>
+
 <!-- ============ 花びらの装飾背景 ============ -->
 <div class="petal-bg" aria-hidden="true">
   <div class="petal p1"></div>
@@ -143,23 +161,22 @@
 
 <!-- ============ UPLOAD ============ -->
 <section class="upload-section" id="upload-section">
-  <div class="profile-bar card" id="profile-bar">
-    <div class="profile-bar-main">
+  <div class="profile-bar card" id="account-bar">
+    <div class="account-main">
       <span class="profile-ico">👤</span>
-      <div class="profile-select-wrap">
-        <label class="profile-label" for="profile-select">あなたのプロフィール</label>
-        <select id="profile-select" class="profile-select"></select>
+      <div class="account-info">
+        <span class="account-name" id="account-name"></span>
+        <span class="account-email" id="account-email"></span>
       </div>
     </div>
     <div class="profile-bar-actions">
-      <button class="btn-profile" id="btn-profile-new" title="新しいプロフィールを作成">＋ 新規</button>
-      <button class="btn-profile" id="btn-profile-rename" title="名前を変更">✎ 名前変更</button>
+      <button class="btn-profile" id="btn-account-pin" title="この端末でのPINロックを設定/変更">🔒 PIN設定</button>
       <button class="btn-profile" id="btn-profile-export" title="この端末のデータをファイルに書き出し">⬇ バックアップ</button>
       <button class="btn-profile" id="btn-profile-import" title="バックアップファイルを読み込み">⬆ 読み込み</button>
-      <button class="btn-profile ghost" id="btn-profile-delete" title="このプロフィールを削除">🗑</button>
+      <button class="btn-profile ghost" id="btn-logout" title="ログアウト">↪ ログアウト</button>
       <input type="file" id="profile-import-file" accept="application/json,.json" hidden />
     </div>
-    <p class="profile-note">📌 データはこの端末の中だけに、プロフィールごとに保存されます。機種変更や履歴消去に備えて、ときどき「バックアップ」で書き出しておきましょう。</p>
+    <p class="profile-note">📌 データはこの端末の中だけに、あなたのアカウント（メール）ごとに保存されます。別の端末には移りません（同期しません）。機種変更前は「バックアップ」で書き出してください。</p>
   </div>
   <div class="resume-banner card" id="resume-banner" hidden></div>
   <div class="upload-main card">

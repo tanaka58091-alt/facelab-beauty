@@ -16,9 +16,10 @@ import {
   saveLastSession, getLastSession, clearLastSession,
 } from './progress.js';
 import {
-  ensureInit as ensureProfiles, listProfiles, getActiveProfile, getActiveProfileId,
-  setActiveProfileId, createProfile, renameProfile, deleteProfile,
-  ns as profileNs, PREFS_KEY_BASE, exportActiveProfile, importProfileData,
+  listProfiles, getActiveProfileId, setActiveProfileId,
+  ns as profileNs, PREFS_KEY_BASE, importIntoActiveAccount, exportActiveAccount,
+  isValidEmail, signInWithEmail, signOut, isSignedIn,
+  getCurrentAccount, accountHasPin, setAccountPin, verifyAccountPin,
 } from './profiles.js';
 
 const $  = s => document.querySelector(s);
@@ -1003,79 +1004,125 @@ if (els.btnClearHistory){
     if (els.baStage) els.baStage.hidden = true;
   });
 }
-// 起動時にも履歴表示を更新(結果未表示でも履歴は残るが、UIは hidden 内なので影響なし)
+// ===== 起動: メール式サインイン・ゲート =====
 document.addEventListener('DOMContentLoaded', () => {
-  ensureProfiles();
-  initProfileUI();
-  loadUserPrefs();
-  // 保存済プリファレンスをフォームに反映
-  applyUserPrefsToForm();
-  renderProgress();
-  // 前回の診断があれば「続きを見る」バナーを表示(写真なしで復元可能に)
-  renderResumeBanner();
+  initAuthGate();
 });
 
-// ===== プロフィール (講座生ごとの個人データ) =====
-function renderProfileSelect(){
-  const sel = document.getElementById('profile-select');
-  if (!sel) return;
-  const profs = listProfiles();
-  const activeId = getActiveProfileId();
-  sel.innerHTML = profs.map(p =>
-    `<option value="${p.id}"${p.id === activeId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`
-  ).join('');
+function initAuthGate(){
+  if (isSignedIn()){
+    const acc = getCurrentAccount();
+    if (acc && accountHasPin(acc.id)){ showSigninGate('pin', acc); }
+    else { enterApp(); }
+  } else {
+    showSigninGate('email');
+  }
 }
 
-// プロフィール切替時: そのプロフィールの設定/履歴を読み込み直す
-function switchProfile(id){
-  setActiveProfileId(id);
-  // フォームを既定値に戻してから保存済みを反映
+// サインイン後にアプリ本体を初期化・表示
+function enterApp(){
+  const gate = document.getElementById('signin-gate');
+  if (gate) gate.hidden = true;
+  document.body.style.overflow = '';
+  initAccountBar();
   loadUserPrefs();
   applyUserPrefsToForm();
   renderProgress();
-  // 既に結果が表示されている場合は隠す(別人のデータと混ざらないように)
-  if (els.results && !els.results.hidden){
-    els.results.hidden = true;
-  }
-  if (els.baStage) els.baStage.hidden = true;
-  // 切替先プロフィールの前回診断バナーに更新
   renderResumeBanner();
 }
 
-function initProfileUI(){
-  renderProfileSelect();
-  const sel = document.getElementById('profile-select');
-  if (sel) sel.addEventListener('change', e => switchProfile(e.target.value));
+// ゲート表示（email入力 / PINロック）
+function showSigninGate(mode, acc){
+  const gate = document.getElementById('signin-gate');
+  const body = document.getElementById('signin-body');
+  if (!gate || !body) return;
+  gate.hidden = false;
+  document.body.style.overflow = 'hidden';
 
-  const btnNew = document.getElementById('btn-profile-new');
-  if (btnNew) btnNew.addEventListener('click', async () => {
-    const name = await uiPrompt({ title:'新しいプロフィール', label:'名前を入力してください（例：田中さん／自分用）', placeholder:'名前', okText:'作成' });
-    if (name === null) return;
-    if (!name.trim()){ await uiAlert({ title:'名前が空です', message:'プロフィール名を入力してください。' }); return; }
-    if (listProfiles().some(p => p.name === name.trim())){ await uiAlert({ title:'同じ名前があります', message:'別の名前を入力してください。' }); return; }
-    const prof = createProfile(name);
-    setActiveProfileId(prof.id);
-    renderProfileSelect();
-    switchProfile(prof.id);
+  if (mode === 'pin'){
+    body.innerHTML = `
+      <p class="signin-lead">${escapeHtml(acc.name || acc.email)} さん、おかえりなさい。<br>PINを入力してください。</p>
+      <input type="password" inputmode="numeric" class="signin-input" id="signin-pin" placeholder="PIN" maxlength="8" autocomplete="off" />
+      <div class="signin-err" id="signin-err" hidden></div>
+      <button class="signin-submit" id="signin-go" type="button">入る</button>
+      <button class="signin-alt" id="signin-switch" type="button">別のメールでサインイン</button>`;
+    const go = () => {
+      const pin = document.getElementById('signin-pin').value;
+      if (verifyAccountPin(acc.id, pin)){ enterApp(); }
+      else { const e = document.getElementById('signin-err'); e.hidden = false; e.textContent = 'PINが違います。'; }
+    };
+    document.getElementById('signin-go').addEventListener('click', go);
+    document.getElementById('signin-pin').addEventListener('keydown', ev => { if (ev.key === 'Enter') go(); });
+    document.getElementById('signin-switch').addEventListener('click', () => { signOut(); showSigninGate('email'); });
+    setTimeout(() => document.getElementById('signin-pin')?.focus(), 40);
+  } else {
+    body.innerHTML = `
+      <p class="signin-lead">メールアドレスで、あなた専用のページに入ります。</p>
+      <input type="email" class="signin-input" id="signin-email" placeholder="メールアドレス" autocomplete="email" />
+      <input type="text" class="signin-input" id="signin-name" placeholder="お名前（任意）" autocomplete="name" />
+      <div class="signin-err" id="signin-err" hidden></div>
+      <button class="signin-submit" id="signin-go" type="button">はじめる / ログイン</button>
+      <p class="signin-note">※ データはこの端末の中だけに保存されます（外部送信なし・別の端末には移りません）。共有端末の方はログイン後に「🔒 PIN設定」をおすすめします。</p>`;
+    const go = () => {
+      const email = document.getElementById('signin-email').value;
+      const name = document.getElementById('signin-name').value;
+      const err = document.getElementById('signin-err');
+      if (!isValidEmail(email)){ err.hidden = false; err.textContent = 'メールアドレスの形式を確認してください。'; return; }
+      const { account } = signInWithEmail(email, name);
+      if (accountHasPin(account.id)){ showSigninGate('pin', account); }
+      else { enterApp(); }
+    };
+    document.getElementById('signin-go').addEventListener('click', go);
+    document.getElementById('signin-name').addEventListener('keydown', ev => { if (ev.key === 'Enter') go(); });
+    setTimeout(() => document.getElementById('signin-email')?.focus(), 40);
+  }
+}
+
+// ===== アカウントバー（サインイン後） =====
+function renderAccountBar(){
+  const acc = getCurrentAccount();
+  const nameEl = document.getElementById('account-name');
+  const emailEl = document.getElementById('account-email');
+  if (nameEl) nameEl.textContent = acc ? `${acc.name || acc.email.split('@')[0]} さん` : '';
+  if (emailEl) emailEl.textContent = acc ? acc.email : '';
+}
+
+let _accountBarWired = false;
+function initAccountBar(){
+  renderAccountBar();
+  if (_accountBarWired) return;
+  _accountBarWired = true;
+
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) btnLogout.addEventListener('click', async () => {
+    const ok = await uiConfirm({ title:'ログアウト', message:'ログアウトします。データはこの端末に残り、次回同じメールで入れば続きから使えます。', okText:'ログアウト' });
+    if (!ok) return;
+    signOut();
+    if (els.results) els.results.hidden = true;
+    if (els.baStage) els.baStage.hidden = true;
+    showSigninGate('email');
   });
 
-  const btnRename = document.getElementById('btn-profile-rename');
-  if (btnRename) btnRename.addEventListener('click', async () => {
-    const cur = getActiveProfile();
-    if (!cur) return;
-    const name = await uiPrompt({ title:'名前を変更', label:'新しいプロフィール名', value:cur.name, okText:'変更' });
-    if (name === null) return;
-    if (!name.trim()){ await uiAlert({ title:'名前が空です', message:'プロフィール名を入力してください。' }); return; }
-    if (listProfiles().some(p => p.name === name.trim() && p.id !== cur.id)){ await uiAlert({ title:'同じ名前があります', message:'別の名前を入力してください。' }); return; }
-    renameProfile(cur.id, name);
-    renderProfileSelect();
+  const btnPin = document.getElementById('btn-account-pin');
+  if (btnPin) btnPin.addEventListener('click', async () => {
+    const acc = getCurrentAccount(); if (!acc) return;
+    if (accountHasPin(acc.id)){
+      const ok = await uiConfirm({ title:'PINロック', message:'この端末のPINロックを解除しますか？', okText:'解除する' });
+      if (ok){ setAccountPin(acc.id, null); await uiAlert({ title:'解除しました', message:'PINロックを解除しました。' }); }
+      return;
+    }
+    const pin = await uiPrompt({ title:'PINを設定', label:'4〜8桁の数字（共有端末で他の人に開かれないようにします）', placeholder:'例: 1234', okText:'設定' });
+    if (pin === null) return;
+    if (!/^\d{4,8}$/.test(pin.trim())){ await uiAlert({ title:'PINの形式', message:'4〜8桁の数字で入力してください。' }); return; }
+    setAccountPin(acc.id, pin.trim());
+    await uiAlert({ title:'設定しました', message:'次回この端末で開くときにPINの入力が必要になります。' });
   });
 
   const btnExport = document.getElementById('btn-profile-export');
   if (btnExport) btnExport.addEventListener('click', () => {
-    const data = exportActiveProfile();
-    const cur = getActiveProfile();
-    const safeName = (cur?.name || 'profile').replace(/[^\w\u3040-\u30ff\u4e00-\u9faf-]+/g, '_');
+    const data = exportActiveAccount();
+    const acc = getCurrentAccount();
+    const safeName = (acc?.name || acc?.email || 'account').replace(/[^\w\u3040-\u30ff\u4e00-\u9faf-]+/g, '_');
     const stamp = new Date().toISOString().slice(0,10);
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1099,10 +1146,9 @@ function initProfileUI(){
       reader.onload = () => {
         try {
           const obj = JSON.parse(reader.result);
-          const prof = importProfileData(obj);
-          renderProfileSelect();
-          switchProfile(prof.id);
-          uiAlert({ title:'読み込み完了', message:`「${escapeHtml(prof.name)}」として読み込みました。` });
+          importIntoActiveAccount(obj);   // 今のアカウントに取り込む
+          loadUserPrefs(); applyUserPrefsToForm(); renderProgress(); renderResumeBanner();
+          uiAlert({ title:'読み込み完了', message:'バックアップをこのアカウントに読み込みました。' });
         } catch(err){
           uiAlert({ title:'読み込みに失敗しました', message: escapeHtml(err?.message || String(err)) });
         }
@@ -1111,26 +1157,6 @@ function initProfileUI(){
       importFile.value = '';
     });
   }
-
-  const btnDelete = document.getElementById('btn-profile-delete');
-  if (btnDelete) btnDelete.addEventListener('click', async () => {
-    const profs = listProfiles();
-    const cur = getActiveProfile();
-    if (!cur) return;
-    if (profs.length <= 1){
-      await uiAlert({ title:'削除できません', message:'最後のプロフィールは削除できません。新しいプロフィールを作成してから削除してください。' });
-      return;
-    }
-    const ok = await uiConfirm({
-      title:'プロフィールを削除',
-      message:`プロフィール「${escapeHtml(cur.name)}」と、その履歴・設定をすべて削除します。<br>この操作は元に戻せません。<br><small>（バックアップ書き出しがお済みでない場合は、先に書き出しをおすすめします）</small>`,
-      okText:'削除する', danger:true,
-    });
-    if (!ok) return;
-    deleteProfile(cur.id);
-    renderProfileSelect();
-    switchProfile(getActiveProfileId());
-  });
 }
 
 function applyUserPrefsToForm(){
