@@ -1756,3 +1756,18 @@ body{
 .ui-dialog-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:24px; flex-wrap:wrap; }
 .ui-dialog-actions .btn-ghost, .ui-dialog-actions .btn-primary{ min-width:100px; justify-content:center; }
 .btn-primary.danger{ background:linear-gradient(120deg,#E8663B,#F0864F); box-shadow:0 4px 14px rgba(232,102,59,.32); }
+
+/* ===== 前回の診断「続きを見る」バナー ===== */
+.resume-banner{ padding:16px 20px; background:linear-gradient(135deg,#FFF4F7,var(--brand-soft)); border:1.5px solid var(--brand-3); }
+.resume-inner{ display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.resume-text{ display:flex; flex-direction:column; gap:3px; }
+.resume-title{ font-size:15px; font-weight:700; color:var(--ink); }
+.resume-sub{ font-size:12.5px; color:var(--ink-2); }
+.resume-btn{
+  background:linear-gradient(120deg,var(--brand),var(--brand-2)); color:#fff; border:none;
+  padding:11px 18px; border-radius:999px; font-size:14px; font-weight:700; cursor:pointer;
+  box-shadow:0 4px 14px rgba(224,122,138,.3); white-space:nowrap; transition:filter .15s, transform .1s;
+}
+.resume-btn:hover{ filter:brightness(1.05); }
+.resume-btn:active{ transform:translateY(1px); }
+.resume-note{ font-size:11.5px; color:var(--muted); margin-top:8px; }

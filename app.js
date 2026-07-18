@@ -13,6 +13,7 @@ import {
   saveSnapshot, listSnapshots, clearHistory, deleteSnapshot,
   thumbnailFromCanvas, buildSnapshotMeta, KEY_METRICS, metricImprovement,
   currentJourneyDay, markDayDone, journeyStats, resetJourney,
+  saveLastSession, getLastSession, clearLastSession,
 } from './progress.js';
 import {
   ensureInit as ensureProfiles, listProfiles, getActiveProfile, getActiveProfileId,
@@ -534,8 +535,11 @@ els.btnAnalyze.addEventListener('click', async () => {
         metrics: state.result.metrics,
       });
       saveSnapshot({ thumbDataUrl: thumb, meta });
+      // 前回セッションを保存(写真なしで結果・プログラムを再表示できるように)
+      persistLastSession({ score, grade, percentile, faceTypeName: type.name, thumb });
       renderProgress();
     } catch(e){ console.warn('[progress] save failed', e); }
+    renderResumeBanner();
 
     hideLoader();
     els.results.hidden = false;
@@ -569,6 +573,83 @@ function renderAll(){
   renderProgramMeta();
   renderProgram(state.currentPhase);
   renderProgress();
+}
+
+// ===== 前回セッションの保存・復元（写真なしで結果・プログラムを再表示） =====
+function persistLastSession({ score, grade, percentile, faceTypeName, thumb }){
+  const r = state.result || {};
+  saveLastSession({
+    createdAt: new Date().toISOString(),
+    score, grade, percentile, faceTypeName,
+    problems: state.problems,
+    result: { metrics: r.metrics, sideScores: r.sideScores, warnings: r.warnings, rollDeg: r.rollDeg, yaw: r.yaw, expression: r.expression },
+    landmarksRaw: r.landmarksRaw,
+    thumb,
+    symptoms: state.symptoms, symptomFree: state.symptomFree,
+    prefs: {
+      ageGroup: state.ageGroup, timeBudget: state.timeBudget, goal: state.goal,
+      priorityKeys: state.priorityKeys, lifestyle: state.lifestyle, contra: state.contra,
+      lifeStage: state.lifeStage, timeOfDay: state.timeOfDay, season: state.season,
+    },
+  });
+}
+
+async function restoreLastSession(){
+  const s = getLastSession();
+  if (!s){ return; }
+  const p = s.prefs || {};
+  state.ageGroup = p.ageGroup || state.ageGroup;
+  state.timeBudget = p.timeBudget || state.timeBudget;
+  state.goal = p.goal || state.goal;
+  state.priorityKeys = p.priorityKeys || [];
+  state.lifestyle = Object.assign({}, state.lifestyle, p.lifestyle || {});
+  state.contra = p.contra || [];
+  state.lifeStage = p.lifeStage || 'none';
+  state.timeOfDay = p.timeOfDay || 'any';
+  state.season = p.season || state.season;
+  state.symptoms = s.symptoms || [];
+  state.symptomFree = s.symptomFree || '';
+  state.result = { ...(s.result || {}), landmarksRaw: s.landmarksRaw };
+  state.problems = s.problems || [];
+  // overlay 用の画像をサムネから復元（無ければオーバーレイは自動で非表示）
+  state.imgFace = null;
+  if (s.thumb){
+    await new Promise(res => { const img = new Image(); img.onload = () => { state.imgFace = img; res(); }; img.onerror = res; img.src = s.thumb; });
+  }
+  state.program = build30DayProgram(state.problems.map(pr => pr.key), {
+    timeBudget: state.timeBudget, goal: state.goal, priorityKeys: state.priorityKeys,
+    ageGroup: state.ageGroup, lifestyle: state.lifestyle, contra: state.contra,
+    lifeStage: state.lifeStage, timeOfDay: state.timeOfDay, season: state.season,
+    history: listSnapshots(),
+  });
+  surfaceAnalysisWarnings(state.result.warnings || []);
+  renderAll();
+  els.results.hidden = false;
+  els.results.classList.add('fade-in');
+  setTimeout(() => els.results.scrollIntoView({ behavior:'smooth', block:'start' }), 100);
+}
+
+// 起動時・プロフィール切替時: 前回の診断があれば「続きを見る」バナーを出す
+function renderResumeBanner(){
+  const host = document.getElementById('resume-banner');
+  if (!host) return;
+  const s = getLastSession();
+  if (!s){ host.hidden = true; host.innerHTML = ''; return; }
+  const d = new Date(s.createdAt);
+  const dateStr = `${d.getMonth()+1}/${d.getDate()}`;
+  const dayNum = currentJourneyDay();
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="resume-inner">
+      <div class="resume-text">
+        <span class="resume-title">📋 前回の診断があります</span>
+        <span class="resume-sub">${dateStr}・スコア ${s.score ?? '--'}${s.faceTypeName ? `（${escapeHtml(s.faceTypeName)}）` : ''}・今日は Day ${dayNum}/30</span>
+      </div>
+      <button class="resume-btn" id="resume-btn" type="button">続きを見る（写真不要）→</button>
+    </div>
+    <div class="resume-note">📸 新しく診断する場合は、下の写真アップロードへ。</div>`;
+  const btn = document.getElementById('resume-btn');
+  if (btn) btn.addEventListener('click', () => restoreLastSession());
 }
 
 // 解析警告のレンダリング (照明・表情・ヨー)
@@ -930,6 +1011,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // 保存済プリファレンスをフォームに反映
   applyUserPrefsToForm();
   renderProgress();
+  // 前回の診断があれば「続きを見る」バナーを表示(写真なしで復元可能に)
+  renderResumeBanner();
 });
 
 // ===== プロフィール (講座生ごとの個人データ) =====
@@ -955,6 +1038,8 @@ function switchProfile(id){
     els.results.hidden = true;
   }
   if (els.baStage) els.baStage.hidden = true;
+  // 切替先プロフィールの前回診断バナーに更新
+  renderResumeBanner();
 }
 
 function initProfileUI(){
@@ -1135,6 +1220,14 @@ function renderMetrics(){
 function renderOverlay(){
   const cv = els.overlayFace;
   const img = state.imgFace;
+  const lmsRaw = state.result?.landmarksRaw;
+  // 画像やランドマークが無い(前回結果の復元で画像未保存など)場合はオーバーレイ枠ごと非表示
+  const pane = cv ? cv.closest('.overlay-grid') : null;
+  if (!img || !img.width || !lmsRaw){
+    if (pane) pane.hidden = true;
+    return;
+  }
+  if (pane) pane.hidden = false;
   const ctx = cv.getContext('2d');
   const maxW = 520;
   const ratio = Math.min(1, maxW / img.width);

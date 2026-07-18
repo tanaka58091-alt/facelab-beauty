@@ -212,3 +212,27 @@ export function diffSnapshots(a, b){
   });
   return out;
 }
+
+// ===================================================================
+// 前回セッション — 写真なしで結果・30日プログラムを復元するための保存
+//   プロフィール名前空間: facelab.lastSession.v1::<profileId>
+//   ここには「解析やり直し不要で結果を再表示」できる最小限を保存する。
+// ===================================================================
+const LAST_SESSION_BASE = 'facelab.lastSession.v1';
+function lastSessionKey(){ return ns(LAST_SESSION_BASE); }
+
+export function saveLastSession(obj){
+  try { localStorage.setItem(lastSessionKey(), JSON.stringify(obj)); return true; }
+  catch(e){
+    // 容量超過時は重い landmarks/thumb を落として最小限で再試行（結果・プログラムは残す）
+    try {
+      const slim = { ...obj }; delete slim.landmarksRaw; delete slim.thumb;
+      localStorage.setItem(lastSessionKey(), JSON.stringify(slim)); return true;
+    } catch(e2){ console.warn('[lastSession] save failed', e2); return false; }
+  }
+}
+export function getLastSession(){
+  try { const r = localStorage.getItem(lastSessionKey()); const o = r ? JSON.parse(r) : null; return (o && typeof o === 'object') ? o : null; }
+  catch(e){ return null; }
+}
+export function clearLastSession(){ try { localStorage.removeItem(lastSessionKey()); } catch(e){} }
