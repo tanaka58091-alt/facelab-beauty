@@ -55,10 +55,13 @@ export function deleteProfile(id){
   [HISTORY_BASE, PREFS_BASE].forEach(base => {
     try { localStorage.removeItem(`${base}::${id}`); } catch(e){}
   });
-  if (rawActiveId() === id){
-    setActiveProfileId(arr[0]?.id || null);
+  // 最後の1件を消したら既定プロフィールを再生成(ensureInit は _inited ガードで効かないため直接)
+  if (arr.length === 0){
+    const prof = createProfile('わたし');
+    setActiveProfileId(prof.id);
+  } else if (rawActiveId() === id){
+    setActiveProfileId(arr[0].id);
   }
-  ensureInit();
   return listProfiles();
 }
 
@@ -129,8 +132,12 @@ export function importProfileData(obj){
   }
   const baseName = (obj.profile && obj.profile.name) ? obj.profile.name : '読み込み';
   const prof = createProfile(`${baseName}（読込）`);
-  if (Array.isArray(obj.history)) safeWrite(`${HISTORY_BASE}::${prof.id}`, obj.history);
-  if (obj.prefs) safeWrite(`${PREFS_BASE}::${prof.id}`, obj.prefs);
+  // 破損バックアップで進捗描画が例外化しないよう history 要素を検証してから保存
+  const cleanHistory = Array.isArray(obj.history)
+    ? obj.history.filter(x => x && typeof x === 'object' && typeof x.id === 'string' && x.createdAt)
+    : [];
+  safeWrite(`${HISTORY_BASE}::${prof.id}`, cleanHistory);
+  if (obj.prefs && typeof obj.prefs === 'object') safeWrite(`${PREFS_BASE}::${prof.id}`, obj.prefs);
   setActiveProfileId(prof.id);
   return prof;
 }

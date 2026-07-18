@@ -191,6 +191,25 @@ const KNOWLEDGE = {
     },
   ],
 
+  // --- 下顔面の縦長感 ---
+  longLowerFace: [
+    {
+      tag: '構造', emoji: '📏',
+      title: '下顔面の"縦長"は筋肉で引き締められる',
+      body: '鼻下〜顎先が長く見えるのは骨格だけでなく、オトガイ筋の過緊張と口輪筋・頬筋の弱化も一因。横方向のメリハリを足すと、同じ骨格でも縦長感は和らぎます。',
+    },
+    {
+      tag: '筋肉', emoji: '💪',
+      title: '"梅干しジワ"はオトガイ筋の緊張サイン',
+      body: '口を閉じたとき顎先に梅干し状のシワが出る人は、オトガイ筋が過剰に働き下唇を押し上げています。ここをゆるめ、口輪筋で唇を閉じ直すと下顔面が締まって見えます。',
+    },
+    {
+      tag: '姿勢', emoji: '🧍',
+      title: '前方頭位が下顔面を間延びさせる',
+      body: 'あご出し姿勢や口呼吸は下顎を引き下げ、下顔面を縦に伸ばして見せます。舌のスポットポジションと首前面の活性で、輪郭の縦横バランスが整います。',
+    },
+  ],
+
   // --- ガミースマイル ---
   gummySmile: [
     {
@@ -429,24 +448,23 @@ const NG_BY_PROBLEM = {
   facialAsymmetry: 1,    // 「無意識クセ」
   nasolabialFold: 0,     // 「ゴリゴリ強マッサージ」
   jawSagging: 1,         // 「無意識クセ」
-  eyeBag: 3,             // 「紫外線対策」
-  foreheadWrinkle: 4,    // 「シワを増やす表情癖」
-  glabellarLine: 4,
+  puffiness: 3,          // 「紫外線対策」
+  foreheadLines: 4,      // 「シワを増やす表情癖」
+  glabellarLines: 4,
   mouthCornerDown: 4,
-  hoodedEye: 2,          // 「表情筋トレの落とし穴」
-  outerEyeDown: 2,
+  hoodedEyelid: 2,       // 「表情筋トレの落とし穴」
+  droopyEyeOuter: 2,
 };
 
 // 問題キー → 栄養/自律神経カードの優先インデックス
 const NUTRI_BY_PROBLEM = {
-  puffinessIdx: [1],         // むくみ三大ミネラル
+  puffiness: [1, 5, 6],      // むくみ三大ミネラル + 目の下ケア
   jawSagging: [0, 4],
   facialAsymmetry: [8],
   nasolabialFold: [3, 0],
-  eyeBag: [5, 6],
-  foreheadWrinkle: [8],
-  glabellarLine: [8, 5],
-  hoodedEye: [5],
+  foreheadLines: [8],
+  glabellarLines: [8, 5],
+  hoodedEyelid: [5],
 };
 
 export function getKnowledgeFor(problemKeys){

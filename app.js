@@ -11,7 +11,8 @@ import { getKnowledgeFor } from './knowledge.js';
 import { buildMotionPlayerHTML, initMotionPlayer, buildStepPanelsHTML, buildHowListHTML, MOTION_DEFS } from './motion.js';
 import {
   saveSnapshot, listSnapshots, clearHistory, deleteSnapshot,
-  thumbnailFromCanvas, buildSnapshotMeta,
+  thumbnailFromCanvas, buildSnapshotMeta, KEY_METRICS, metricImprovement,
+  currentJourneyDay, markDayDone, journeyStats, resetJourney,
 } from './progress.js';
 import {
   ensureInit as ensureProfiles, listProfiles, getActiveProfile, getActiveProfileId,
@@ -627,11 +628,9 @@ function renderPrescriptionLink(){
 }
 
 // ===== Progress (履歴) =====
-const METRIC_LABEL = {
-  midlineTilt:'中心軸の傾き', eyeHeightDiff:'目の高さ差', browHeightDiff:'眉の高さ差',
-  mouthTilt:'口角の傾き', jawSlackRatio:'フェイスラインのたるみ', mouthCornerDrop:'口角の下がり',
-  nasolabialDepth:'ほうれい線の深さ', puffinessIdx:'むくみ指数',
-};
+// 進捗で見せる指標は progress.js の KEY_METRICS が正本(キー名は analyzer と一致)
+const METRIC_LABEL = Object.fromEntries(KEY_METRICS.map(m => [m.key, m.label]));
+const METRIC_DIR   = Object.fromEntries(KEY_METRICS.map(m => [m.key, m.dir]));
 function renderProgress(){
   const snaps = listSnapshots();
   if (els.progressStat) els.progressStat.textContent = `履歴: ${snaps.length}件`;
@@ -753,7 +752,7 @@ function renderScoreTrend(snapsNewestFirst){
   const metricRows = Object.keys(kmLast)
     .filter(k => k in kmFirst && (k in METRIC_LABEL))
     .map(k => {
-      const improve = Math.abs(kmLast[k]) - Math.abs(kmFirst[k]); // - で改善
+      const improve = metricImprovement(METRIC_DIR[k], kmFirst[k], kmLast[k]); // - で改善(方向考慮)
       const cls = improve < -0.002 ? 'up' : improve > 0.002 ? 'down' : 'flat';
       const ico = cls === 'up' ? '▲改善' : cls === 'down' ? '▼悪化' : '→維持';
       return `<div class="trend-metric ${cls}"><span>${METRIC_LABEL[k]}</span><b>${ico}</b></div>`;
@@ -809,7 +808,7 @@ function showBeforeAfter(before, after){
     .filter(k => k in km1 && (k in METRIC_LABEL))
     .map(k => {
       const d = km2[k] - km1[k];
-      const improve = Math.abs(km2[k]) - Math.abs(km1[k]); // - なら改善
+      const improve = metricImprovement(METRIC_DIR[k], km1[k], km2[k]); // - なら改善(方向考慮)
       return { k, label: METRIC_LABEL[k], from: km1[k], to: km2[k], d, improve };
     });
   const metricRows = changes.map(c => {
@@ -1031,10 +1030,14 @@ function escapeHtml(s){
 
 function renderScoreAndType(){
   const score = calcScore(state.result, state.problems);
-  const { grade, desc } = gradeFromScore(score, { ageGroup: state.ageGroup });
+  const { grade, desc, percentile } = gradeFromScore(score, { ageGroup: state.ageGroup });
   els.scoreValue.textContent = score;
   els.scoreGrade.textContent = grade;
-  els.scoreDesc.textContent = desc;
+  // ポジティブ枠: 伸びしろ文 + (上位半分のときだけ)同年代の目安 + あなたの強み(部位)
+  const pctNote = (percentile && percentile <= 50) ? ` 同年代で上位${percentile}%の目安。` : '';
+  const strength = bestSideStrength();
+  const strengthNote = strength ? ` あなたの強みは「${strength}」。` : '';
+  els.scoreDesc.textContent = desc + pctNote + strengthNote;
   const circ = 2 * Math.PI * 52;
   els.scoreArc.setAttribute('stroke-dashoffset', circ - (score/100) * circ);
 
@@ -1042,6 +1045,21 @@ function renderScoreAndType(){
   els.faceType.textContent = type.name;
   els.faceTypeDesc.textContent = type.desc;
   els.faceTypeTags.innerHTML = type.tags.map(t => `<span>${t}</span>`).join('');
+}
+
+// 左右独立スコアから最も高い部位を「強み」として返す(60未満なら無し)
+function bestSideStrength(){
+  const s = state.result?.sideScores;
+  if (!s) return '';
+  const labels = { eye:'目の開き', naso:'ほうれい線まわり', corner:'口角', browLid:'まぶたの余白', eyeSlant:'目尻', jaw:'フェイスライン' };
+  let best = null;
+  ['left','right'].forEach(side => {
+    Object.entries(labels).forEach(([k,lbl]) => {
+      const v = s[side]?.[k];
+      if (typeof v === 'number' && (!best || v > best.v)) best = { v, lbl };
+    });
+  });
+  return best && best.v >= 60 ? best.lbl : '';
 }
 
 function renderMetrics(){
@@ -1267,14 +1285,53 @@ function renderKnowledge(){
 
 // ===== Today menu =====
 function renderToday(){
-  // 30日プログラムの Day1 の training を流用(同じ設計ロジック)
-  const day1 = state.program?.[0];
-  if (!day1) return;
-  els.todayGrid.innerHTML = day1.training.map(ex => exerciseCard(ex)).join('');
+  // ジャーニーの「今日のDay」を表示(未完了の最小Day)。毎回Day1固定にしない。
+  const dayNum = currentJourneyDay();
+  const today = state.program?.[dayNum - 1] || state.program?.[0];
+  if (!today) return;
+  renderJourneyBar(dayNum);
+  els.todayGrid.innerHTML = today.training.map(ex => exerciseCard(ex)).join('');
   bindExerciseCards(els.todayGrid);
-  if (els.todayReason && day1.reason){
-    els.todayReason.innerHTML = `<span class="reason-title">🎯 なぜ今日この${day1.training.length}種なのか</span>${escapeHtml(day1.reason)}`;
+  if (els.todayReason && today.reason){
+    els.todayReason.innerHTML = `<span class="reason-title">🎯 なぜ今日この${today.training.length}種なのか（Day ${dayNum}）</span>${escapeHtml(today.reason)}`;
   }
+}
+
+// 継続の仕組み: Day進行・連続日数・30マス進捗・完了ボタン
+function renderJourneyBar(dayNum){
+  const host = document.getElementById('journey-bar');
+  if (!host) return;
+  const st = journeyStats();
+  const allDone = st.doneCount >= 30;
+  const dots = Array.from({ length: 30 }, (_, i) => {
+    const d = i + 1;
+    const done = !!st.done[d];
+    const isToday = d === dayNum && !allDone;
+    return `<span class="jr-dot${done ? ' done' : ''}${isToday ? ' today' : ''}" title="Day ${d}${done ? '（完了）' : ''}"></span>`;
+  }).join('');
+  const gapNote = (!allDone && st.gapDays != null && st.gapDays >= 2)
+    ? `<div class="jr-gap">前回から${st.gapDays}日ぶり。今日から気軽に再開しましょう 🌷</div>` : '';
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="jr-top">
+      <div class="jr-day">${allDone ? '🎉 30日プログラム達成！' : `今日は <strong>Day ${dayNum}</strong> <small>/ 30</small>`}</div>
+      <div class="jr-stats">
+        <span class="jr-streak">🔥 連続 ${st.streak}日</span>
+        <span class="jr-count">達成 ${st.doneCount}/30</span>
+      </div>
+    </div>
+    <div class="jr-dots" aria-label="30日の進捗">${dots}</div>
+    ${gapNote}
+    ${allDone
+      ? `<button class="jr-done-btn is-done" type="button" disabled>すべて完了しました 🌸</button>`
+      : `<button class="jr-done-btn" id="jr-done-btn" type="button">Day ${dayNum} を完了する ✓</button>`}
+  `;
+  const btn = document.getElementById('jr-done-btn');
+  if (btn) btn.addEventListener('click', () => {
+    markDayDone(dayNum);
+    renderToday();      // 次のDayへ進む
+    renderProgram(state.currentPhase); // プログラム側の✓も更新
+  });
 }
 
 function renderProgramMeta(){
@@ -1322,7 +1379,8 @@ function renderProgram(phase){
   state.currentPhase = phase;
   $$('.phase-tab').forEach(t => t.classList.toggle('active', +t.dataset.phase === phase));
   const days = state.program.filter(d => d.phase === phase);
-  els.programGrid.innerHTML = days.map(d => dayCard(d)).join('');
+  const doneSet = journeyStats().done;
+  els.programGrid.innerHTML = days.map(d => dayCard(d, doneSet)).join('');
   els.programGrid.querySelectorAll('.day-card').forEach(card => {
     card.addEventListener('click', () => {
       const day = +card.dataset.day;
@@ -1330,10 +1388,11 @@ function renderProgram(phase){
     });
   });
 }
-function dayCard(d){
+function dayCard(d, doneSet){
+  const done = doneSet && doneSet[d.day];
   return `
-    <div class="day-card ${d.isRest?'rest':''}" data-day="${d.day}">
-      <span class="day-badge">${d.isRest?'REST':'WORK'}</span>
+    <div class="day-card ${d.isRest?'rest':''}${done?' done':''}" data-day="${d.day}">
+      <span class="day-badge">${done?'✓ 済':d.isRest?'REST':'WORK'}</span>
       <div class="day-num">DAY ${String(d.day).padStart(2,'0')}</div>
       <div class="day-theme">${d.theme}</div>
       <ul class="day-list">

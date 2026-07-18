@@ -1666,3 +1666,46 @@ body{
   .card{ break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
   .day-card{ break-inside: avoid; }
 }
+
+/* ===== 30日ジャーニー(継続の仕組み) ===== */
+.journey-bar{
+  background: linear-gradient(135deg, var(--brand-soft), #FFF4F7);
+  border: 1px solid var(--brand-3);
+  border-radius: 18px; padding: 18px 20px; margin-bottom: 18px;
+}
+.jr-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.jr-day{ font-size: 17px; color: var(--ink); }
+.jr-day strong{ font-size: 22px; color: var(--brand); }
+.jr-day small{ color: var(--muted); font-weight:500; }
+.jr-stats{ display:flex; gap:8px; flex-wrap:wrap; }
+.jr-streak, .jr-count{
+  background:#fff; border:1px solid var(--brand-3); color: var(--ink-2);
+  font-size:12.5px; font-weight:600; padding:5px 12px; border-radius:999px;
+}
+.jr-streak{ color:#E8663B; }
+.jr-dots{ display:flex; flex-wrap:wrap; gap:5px; margin:14px 0 4px; }
+.jr-dot{
+  width:14px; height:14px; border-radius:50%;
+  background:#fff; border:1.5px solid var(--brand-3); box-sizing:border-box; transition:transform .15s;
+}
+.jr-dot.done{ background: var(--brand-2); border-color: var(--brand-2); }
+.jr-dot.today{ border:2.5px solid var(--gold); transform:scale(1.25); box-shadow:0 0 0 2px rgba(255,217,61,.25); }
+.jr-gap{ color:#E8663B; font-size:12.5px; margin:8px 0 0; }
+.jr-done-btn{
+  display:block; width:100%; margin-top:14px; padding:13px;
+  background: linear-gradient(120deg, var(--brand) 0%, var(--brand-2) 100%);
+  color:#fff; font-size:15px; font-weight:700; border:none; border-radius:12px;
+  cursor:pointer; box-shadow:0 4px 14px rgba(224,122,138,.3); transition:filter .15s, transform .1s;
+}
+.jr-done-btn:hover{ filter:brightness(1.05); }
+.jr-done-btn:active{ transform:translateY(1px); }
+.jr-done-btn.is-done{
+  background:#EAF7EE; color:#2E9E5B; box-shadow:none; cursor:default; border:1px solid #BFE6CC;
+}
+.day-card.done{ position:relative; }
+.day-card.done::after{
+  content:'✓'; position:absolute; top:8px; right:10px;
+  width:20px; height:20px; line-height:20px; text-align:center;
+  background:#2E9E5B; color:#fff; border-radius:50%; font-size:12px; font-weight:700;
+}
+.day-card.done .day-badge{ background:#EAF7EE; color:#2E9E5B; }

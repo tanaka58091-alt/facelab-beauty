@@ -8,6 +8,33 @@ import { ns, HISTORY_KEY_BASE } from './profiles.js';
 
 const MAX_SNAPSHOTS = 30; // 上限(古いものから自動削除)
 
+// ===================================================================
+// 履歴で追跡する主要指標の正本(キー名は analyzer.js の metrics と一致必須)
+//   dir: 'zero'=0に近いほど良い / 'lower'=小さいほど良い / 'higher'=大きいほど良い
+// この配列を pickKeyMetrics(保存) / app.js(Before-After・推移) /
+// program.js(履歴ブースト) の3箇所で共有し、キー名と方向の齟齬を防ぐ。
+// ===================================================================
+export const KEY_METRICS = [
+  { key:'midlineTilt',     label:'中心軸の傾き',           dir:'zero'   },
+  { key:'eyeHeightDiff',   label:'目の高さ差',             dir:'zero'   },
+  { key:'browHeightDiff',  label:'眉の高さ差',             dir:'zero'   },
+  { key:'mouthTilt',       label:'口角の傾き',             dir:'zero'   },
+  { key:'mouthCornerDrop', label:'口角の下がり',           dir:'lower'  },
+  { key:'cheekDrop',       label:'フェイスラインのたるみ', dir:'lower'  },
+  { key:'nasolabialIndex', label:'ほうれい線',             dir:'higher' },
+  { key:'faceWHRatio',     label:'むくみ(顔の横縦比)',     dir:'lower'  },
+  { key:'wrinkleIdx',      label:'肌のハリ・シワ',         dir:'lower'  },
+  { key:'toneEvenness',    label:'肌トーン均一度',         dir:'higher' },
+];
+const KEY_METRIC_LABEL = Object.fromEntries(KEY_METRICS.map(m => [m.key, m.label]));
+
+// 改善量を「負=改善」の符号で返す(方向を考慮)
+export function metricImprovement(dir, before, after){
+  if (dir === 'higher') return before - after;            // 増えたら改善→負
+  if (dir === 'lower')  return after - before;            // 減ったら改善→負
+  return Math.abs(after) - Math.abs(before);              // zero: 0へ近づくと改善→負
+}
+
 // アクティブな講座生プロフィールに紐づく履歴キー
 function storageKey(){ return ns(HISTORY_KEY_BASE); }
 
@@ -21,8 +48,8 @@ function safeRead(){
   } catch(e){ return []; }
 }
 function safeWrite(arr){
-  try { localStorage.setItem(storageKey(), JSON.stringify(arr)); }
-  catch(e){ console.warn('[progress] localStorage write failed', e); }
+  try { localStorage.setItem(storageKey(), JSON.stringify(arr)); return true; }
+  catch(e){ console.warn('[progress] localStorage write failed', e); return false; }
 }
 
 // 解析後の Canvas をサムネ化(JPEG, 最大 200px 幅)
@@ -59,9 +86,10 @@ export function buildSnapshotMeta({ score, grade, faceType, ageGroup, goal, prob
 }
 function pickKeyMetrics(m){
   if (!m) return {};
-  const keys = ['midlineTilt','eyeHeightDiff','browHeightDiff','mouthTilt','jawSlackRatio','mouthCornerDrop','nasolabialDepth','puffinessIdx','wrinkleIdx','toneEvenness'];
   const out = {};
-  keys.forEach(k => { if (k in m) out[k] = round3(m[k]); });
+  KEY_METRICS.forEach(({ key }) => {
+    if (key in m && m[key] != null && !Number.isNaN(+m[key])) out[key] = round3(m[key]);
+  });
   return out;
 }
 function round3(v){
@@ -80,7 +108,14 @@ export function saveSnapshot({ thumbDataUrl, meta }){
   };
   arr.unshift(item);
   if (arr.length > MAX_SNAPSHOTS) arr.length = MAX_SNAPSHOTS;
-  safeWrite(arr);
+  // 容量超過(QuotaExceeded)時は履歴を無言で失わないよう段階的に間引いて再試行する。
+  let ok = safeWrite(arr);
+  for (let i = arr.length - 1; i >= 0 && !ok; i--){
+    if (arr[i].thumb){ arr[i].thumb = null; ok = safeWrite(arr); } // 1) 古い順にサムネを外す
+  }
+  while (!ok && arr.length > 1){
+    arr.pop(); ok = safeWrite(arr);                                // 2) それでも入らねば最古スナップを削除
+  }
   return item;
 }
 
@@ -96,6 +131,71 @@ export function deleteSnapshot(id){
 
 export function clearHistory(){
   try { localStorage.removeItem(storageKey()); } catch(e){}
+}
+
+// ===================================================================
+// 30日ジャーニー(継続の仕組み) — 開始日・各Dayの完了・連続日数
+//   プロフィール名前空間で localStorage に保持:
+//     facelab.journey.v1::<profileId> = { startDate, done:{"1":"YYYY-MM-DD",..}, streak, lastDoneDate }
+// ===================================================================
+const JOURNEY_BASE = 'facelab.journey.v1';
+function journeyKey(){ return ns(JOURNEY_BASE); }
+function ymd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+export function getJourney(){
+  try {
+    const r = localStorage.getItem(journeyKey());
+    const j = r ? JSON.parse(r) : null;
+    if (j && typeof j === 'object'){
+      return { startDate:j.startDate||null, done:(j.done&&typeof j.done==='object')?j.done:{}, streak:j.streak||0, lastDoneDate:j.lastDoneDate||null };
+    }
+  } catch(e){}
+  return { startDate:null, done:{}, streak:0, lastDoneDate:null };
+}
+function saveJourney(j){ try { localStorage.setItem(journeyKey(), JSON.stringify(j)); } catch(e){} }
+
+// 今日取り組むDay = 未完了の最小Day(1..30)。全部済みなら30を返す。
+export function currentJourneyDay(){
+  const j = getJourney();
+  for (let d=1; d<=30; d++){ if (!j.done[d]) return d; }
+  return 30;
+}
+
+export function markDayDone(day){
+  const j = getJourney();
+  const today = ymd(new Date());
+  if (!j.startDate) j.startDate = today;
+  if (!j.done[day]){
+    j.done[day] = today;
+    if (j.lastDoneDate !== today){       // 同じ日に複数完了してもストリークは1回だけ加算
+      const yst = new Date(); yst.setDate(yst.getDate()-1);
+      j.streak = (j.lastDoneDate === ymd(yst)) ? (j.streak||0)+1 : 1;
+      j.lastDoneDate = today;
+    }
+  }
+  saveJourney(j);
+  return j;
+}
+
+export function unmarkDayDone(day){
+  const j = getJourney();
+  if (j.done[day]){ delete j.done[day]; saveJourney(j); }
+  return j;
+}
+
+export function resetJourney(){ try { localStorage.removeItem(journeyKey()); } catch(e){} }
+
+export function journeyStats(){
+  const j = getJourney();
+  const doneCount = Object.keys(j.done).length;
+  const today = ymd(new Date());
+  const doneToday = Object.values(j.done).includes(today);
+  let gapDays = null;
+  if (j.lastDoneDate){
+    const last = new Date(j.lastDoneDate + 'T00:00:00');
+    gapDays = Math.round((new Date(today + 'T00:00:00') - last) / 86400000);
+  }
+  return { doneCount, streak:j.streak||0, doneToday, gapDays, startDate:j.startDate, done:j.done };
 }
 
 // 2件比較(差分): a が新しい、b が古い → score差・指標差を返す

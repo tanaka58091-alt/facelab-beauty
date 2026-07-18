@@ -13,6 +13,7 @@
 //   lifestyle:    { sleep, posture, diet, stress } 生活背景タグ(出力理由文に反映)
 // ===================================================================
 import { EXERCISES, EXERCISE_META, PRESCRIPTION_MAP, getMeta, isExerciseAllowed } from './exercises.js';
+import { KEY_METRICS, metricImprovement } from './progress.js';
 
 // === 季節バイアス (Phase 2-9) ===
 // 各季節で特に意識したいゾーン/種目に弱い優先付与
@@ -277,7 +278,7 @@ export function build30DayProgram(problemKeys, opts={}){
       day, phase, isRest,
       theme: themeFor(phase, dayInPhase, isRest),
       training,
-      reason: buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget, contra, lifeStage, timeOfDay, season, history }),
+      reason: buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget, contra, lifeStage, timeOfDay, season, history, historyBoostActive: Object.keys(historyBoost).length > 0 }),
     });
   }
   return days;
@@ -287,17 +288,18 @@ export function build30DayProgram(problemKeys, opts={}){
 function buildHistoryBoost(history, problemKeys){
   if (!history || history.length < 2) return {};
   // 最新2スナップを比較し、悪化/停滞している指標に紐づく種目を強化
+  // 注: スナップショットは平坦化され keyMetrics に主要指標を持つ(progress.js saveSnapshot)
   const latest = history[0];
   const prev   = history[1];
-  if (!latest?.meta?.metrics || !prev?.meta?.metrics) return {};
-  const lm = latest.meta.metrics;
-  const pm = prev.meta.metrics;
+  const lm = latest?.keyMetrics;
+  const pm = prev?.keyMetrics;
+  if (!lm || !pm) return {};
   const boost = {};
-  // 各メトリクスの改善方向 (低いほど良いと仮定)
-  Object.keys(lm).forEach(key => {
+  KEY_METRICS.forEach(({ key, dir }) => {
     if (typeof lm[key] !== 'number' || typeof pm[key] !== 'number') return;
-    const delta = lm[key] - pm[key];
-    if (delta >= -0.005) {
+    // pm=前回(before) / lm=最新(after)。improve<0 が改善。指標の方向を考慮する。
+    const improve = metricImprovement(dir, pm[key], lm[key]);
+    if (improve >= -0.005) {
       // 改善が乏しい/悪化 → その問題に紐づくPRESCRIPTION_MAP種目をブースト
       const probKey = METRIC_TO_PROBLEM[key];
       if (probKey && PRESCRIPTION_MAP[probKey]) {
@@ -310,19 +312,20 @@ function buildHistoryBoost(history, problemKeys){
   return boost;
 }
 
+// キー名は analyzer.js の metrics(= keyMetrics 保存名)と一致させる
 const METRIC_TO_PROBLEM = {
   midlineTilt: 'facialAsymmetry',
   eyeHeightDiff: 'facialAsymmetry',
   browHeightDiff: 'facialAsymmetry',
   mouthTilt: 'facialAsymmetry',
-  jawSlackRatio: 'jawSagging',
+  cheekDrop: 'jawSagging',
   mouthCornerDrop: 'mouthCornerDown',
-  nasolabialDepth: 'nasolabialFold',
-  puffinessIdx: 'puffiness',
+  nasolabialIndex: 'nasolabialFold',
+  faceWHRatio: 'puffiness',
 };
 
 // 日ごとの「なぜこのメニュー」テキスト生成
-function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget, contra=[], lifeStage='none', timeOfDay='any', season=null, history=[] }){
+function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget, contra=[], lifeStage='none', timeOfDay='any', season=null, history=[], historyBoostActive=false }){
   if (isRest){
     return `Day${day}は循環優先のアクティブレスト。${timeBudget}分以内・軽強度のみで構成し、明日からの集中強化に備えます。`;
   }
@@ -355,7 +358,7 @@ function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, life
   const todNote = timeOfDay === 'morning' ? '朝向けの覚醒系種目を優先しています。'
                 : timeOfDay === 'evening' ? '夜向けのリリース・脱力系種目を優先しています。'
                 : '';
-  const histNote = (history && history.length >= 2)
+  const histNote = historyBoostActive
     ? `過去スナップショット${history.length}件と比較し、改善が遅い指標向けの種目を弱く優先しています。`
     : '';
 

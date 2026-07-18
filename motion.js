@@ -177,6 +177,7 @@ export function initMotionPlayer(rootEl, exerciseId){
   }
   function play(){
     if (playing) return;
+    if (elapsed >= m.duration){ elapsed = 0; currentStep = -1; } // 完了後に▶を押したら最初から再生
     playing = true;
     start = Date.now() - elapsed * 1000;
     stage.classList.add('is-playing');

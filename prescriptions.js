@@ -8,23 +8,23 @@
 // ===================================================================
 
 export const PRESCRIPTION_MAP = {
-  facialAsymmetry: { training: ['symmetrySmile','oneSideSmile','browSolo','chopstickTrain','mouthCornerLift','fullFlow','postureFace','aiueoTrain','balloonFace','tongueStretch'] },
-  mouthCornerDown: { training: ['mouthCornerLift','mouthCornerTongue','chopstickTrain','cheekLift','smileHold','aiueoTrain','beakPose','fullFlow','lipPucker'] },
+  facialAsymmetry: { training: ['symmetrySmile','oneSideRelease','oneSideSmile','browSolo','chopstickTrain','mouthCornerLift','fullFlow','postureFace','aiueoTrain','balloonFace','tongueStretch'] },
+  mouthCornerDown: { training: ['mouthCornerLift','cornerDepressorRelease','mouthCornerTongue','chopstickTrain','cheekLift','smileHold','aiueoTrain','beakPose','fullFlow','lipPucker'] },
   nasolabialFold:  { training: ['nasolabialStretch','cheekLiftAssist','balloonFace','cheekLift','tongueRoll','chinUpPose','mouthCornerTongue','upperLipTrain','cheekPump','fishFace'] },
-  jawSagging:      { training: ['chinTuck','chinPress','neckFront','octopusPose','jawSlide','tonguePress','swallowTrain','chinMassage','neckIso','beakPose'] },
-  puffiness:       { training: ['tongueOut','cheekPump','cheekAir','clavicleLymph','neckMassage','faceMassage','breathGlow','bloodFlowPose','munchFace','chinMassage'] },
+  jawSagging:      { training: ['chinTuck','chinPress','neckFront','faceLymphDrain','octopusPose','jawSlide','tonguePress','swallowTrain','chinMassage','neckIso','beakPose'] },
+  puffiness:       { training: ['faceLymphDrain','tongueOut','earYoga','cheekPump','cheekAir','clavicleLymph','neckMassage','faceMassage','breathGlow','bloodFlowPose','munchFace','chinMassage'] },
   partsBalance:    { training: ['fullFlow','freshFacePose','browRaise','eyeWideOpen','cheekLift','mouthCornerLift','symmetrySmile','aiueoTrain','smileHold'] },
-  masseterHypertrophy: { training: ['masseterRelease','masseterTap','masseterStretch','templeRelease','mouthOpen','jawSlide','faceRelax','neckSide'] },
+  masseterHypertrophy: { training: ['masseterRelease','oneSideRelease','masseterTap','masseterStretch','templeRelease','earYoga','mouthOpen','jawSlide','faceRelax','neckSide'] },
   cheekHollow:     { training: ['cheekPump','balloonFace','cheekAir','cheekLift','cheekLiftAssist','tongueRoll','nasolabialStretch','cheekBoneMassage'] },
   longPhiltrum:    { training: ['upperLipTrain','lipPucker','bigO','mouthCornerTongue','aiueoTrain','cheekLift','lipOpenClose'] },
   gummySmile:      { training: ['upperLipTrain','mouthCornerLift','lipPucker','smileHold','symmetrySmile','cheekLift','aiueoTrain'] },
   hoodedEyelid:    { training: ['eyeWideOpen','binocularPose','browRaise','foreheadSmooth','hairlineLift','eyeRelease','lowerLidLift','blinkReset'] },
   droopyEyeOuter:  { training: ['outerEyeLift','binocularPose','eyeWideOpen','lowerLidLift','browRaise','eyeRelease','symmetrySmile'] },
   longLowerFace:   { training: ['chinTuck','tonguePress','neckFront','chinPress','octopusPose','postureFace','mouthOpen','faceRelax'] },
-  templeHollow:    { training: ['templeRelease','masseterRelease','browRaise','foreheadSmooth','faceMassage','faceRelax','hairlineLift'] },
+  templeHollow:    { training: ['templeRelease','earYoga','oneSideRelease','masseterRelease','browRaise','foreheadSmooth','faceMassage','faceRelax','hairlineLift'] },
   foreheadLines:   { training: ['foreheadSmooth','hairlineLift','browUpDown','browRaise','glabellaRelease','faceRelax','diaphragmBreath','templeRelease'] },
   glabellarLines:  { training: ['glabellaRelease','browUpDown','foreheadSmooth','faceRelax','diaphragmBreath','breathGlow','eyeRelease','templeRelease'] },
-  general:         { training: ['fullFlow','cheekLift','mouthCornerLift','tongueRoll','aiueoTrain','chinTuck','browRaise','breathGlow','faceRelax','postureFace','smileHold','neckFront'] },
+  general:         { training: ['fullFlow','cheekLift','mouthCornerLift','tongueRoll','aiueoTrain','chinTuck','browRaise','earYoga','faceLymphDrain','breathGlow','faceRelax','postureFace','smileHold','neckFront'] },
 };
 
 // zone: upper(額・目・眉) / mid(頬・鼻・口輪) / lower(口角・あご・首)
@@ -107,6 +107,11 @@ export const EXERCISE_META = {
   symmetrySmile:    { zone:'mid',   intensity:'medium', tier:2 },
   oneSideSmile:     { zone:'lower', intensity:'medium', tier:2 },
   smileHold:        { zone:'mid',   intensity:'medium', tier:1 },
+  // 網羅性強化（v6.2 追加）
+  earYoga:          { zone:'mid',   intensity:'light',  tier:1 },
+  oneSideRelease:   { zone:'lower', intensity:'light',  tier:2 },
+  faceLymphDrain:   { zone:'mid',   intensity:'light',  tier:1 },
+  cornerDepressorRelease: { zone:'lower', intensity:'light', tier:2 },
 };
 
 export const CONTRA_LABEL = {
@@ -172,7 +177,7 @@ export const EXERCISE_META_EXT = {
   smileHold:        { tools:['mirror'] },
   browSolo:         { tools:['mirror'] },
   chopstickTrain:   { tools:['pen','mirror'], warning:'割り箸は強く噛まないこと' },
-  lipPucker:        { tools:['pen'] },
+  lipPucker:        { tools:['none'] },
   cheekLift:        { tools:['fingers','mirror'] },
   cheekLiftAssist:  { tools:['fingers','mirror'] },
   chinPress:        { tools:['fingers'] },
@@ -181,16 +186,21 @@ export const EXERCISE_META_EXT = {
   // --- 呼吸系（妊娠中・高血圧は注意） ---
   breathGlow:      { contra:['highBp','pregnancy'], timeOfDay:['evening'], warning:'息を止めず、めまいが出たら中止' },
   diaphragmBreath: { contra:['pregnancy'], timeOfDay:['evening'] },
-  bloodFlowPose:   { contra:['highBp','pregnancy'] },
+  bloodFlowPose:   { contra:['highBp','pregnancy'], warning:'立ちくらみ・めまいが出たら中止' },
   tongueOut:       { contra:['highBp'], timeOfDay:['morning'] },
 
   // --- 朝のスイッチ系 ---
   fullFlow:        { timeOfDay:['morning'] },
   aiueoTrain:      { timeOfDay:['morning'] },
   tongueRoll:      { timeOfDay:['morning'] },
-  freshFacePose:   { tools:['mirror'], timeOfDay:['morning'] },
+  freshFacePose:   { tools:['mirror'], contra:['tmj'], timeOfDay:['morning'], warning:'あごが痛むときは無理に大きく開けない' },
   // --- 夜のリラックス系 ---
   faceRelax:       { timeOfDay:['evening'] },
+  // --- 網羅性強化（v6.2 追加） ---
+  earYoga:                { tools:['none'] },
+  oneSideRelease:         { tools:['fingers'], contra:['skinSensitive'] },
+  faceLymphDrain:         { tools:['fingers'], contra:['skinSensitive'] },
+  cornerDepressorRelease: { tools:['fingers'], contra:['skinSensitive'] },
 };
 
 export function getMeta(id){

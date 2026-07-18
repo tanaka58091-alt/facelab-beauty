@@ -221,15 +221,19 @@ function analyzePixels(image, lms, scale){
   const toneUnevenness = toneN ? (toneVarSum / toneN) / 255 : 0;
   const toneEvenness = Math.max(0, 1 - toneUnevenness * 4);
 
+  // 画像端で顔が切れ、頬/額の矩形サンプルが取れないと 0 が『完璧な肌』に化ける。
+  // 有効サンプルが不足する場合は指標を null(=計測不能・非表示)にする。
+  const validTexture = [leftCheek, rightCheek, forehead].filter(Boolean).length;
+
   return {
     luminanceOverall,
     lightingBalance,
     leftCheekLum: lumLC, rightCheekLum: lumRC,
-    wrinkleIdx,
+    wrinkleIdx: validTexture >= 2 ? wrinkleIdx : null,
     leftCheekTexture: textureLC,
     rightCheekTexture: textureRC,
     foreheadTexture: textureFH,
-    toneEvenness,
+    toneEvenness: regions.length >= 3 ? toneEvenness : null,
     toneUnevenness,
   };
 }
@@ -382,21 +386,23 @@ export function analyzeFace(rawLms, opts={}){
   // 各部位の左右別 0-100 スコア。高いほど良好。
   // 注: 写真の左右と顔の左右は鏡像なので、ここでは画像の左=ユーザーの右(向かって左)として扱う。
   const sideScores = (() => {
+    // 部位別スコアは「ふつうの顔が概ね60〜85に収まり、目立つ偏りだけが50未満に落ちる」
+    // よう較正する(厳しすぎると全員が低スコアになり自己否定的になるため)。
     // 目: 開眼度 (大きいほど良好)
-    const lEyeOpenScore = clamp01((lEyeH - 0.020) / 0.025) * 100;
-    const rEyeOpenScore = clamp01((rEyeH - 0.020) / 0.025) * 100;
+    const lEyeOpenScore = clamp01((lEyeH - 0.015) / 0.030) * 100;
+    const rEyeOpenScore = clamp01((rEyeH - 0.015) / 0.030) * 100;
     // ほうれい線: 距離が大きいほど良好
-    const lNasoScore = clamp01((nasoL - 0.34) / 0.10) * 100;
-    const rNasoScore = clamp01((nasoR - 0.34) / 0.10) * 100;
+    const lNasoScore = clamp01((nasoL - 0.27) / 0.15) * 100;
+    const rNasoScore = clamp01((nasoR - 0.27) / 0.15) * 100;
     // 口角: 下垂 0 以下が理想
-    const lCornerScore = clamp01(1 - Math.max(0, lCornerDrop) / 0.04) * 100;
-    const rCornerScore = clamp01(1 - Math.max(0, rCornerDrop) / 0.04) * 100;
+    const lCornerScore = clamp01(1 - Math.max(0, lCornerDrop) / 0.055) * 100;
+    const rCornerScore = clamp01(1 - Math.max(0, rCornerDrop) / 0.055) * 100;
     // 眉-まぶた: 大きいほど良好
-    const lBrowLidScore = clamp01((lBrowToLid - 0.10) / 0.10) * 100;
-    const rBrowLidScore = clamp01((rBrowToLid - 0.10) / 0.10) * 100;
-    // 目尻の傾き: 0 が理想
-    const lEyeSlantScore = clamp01(1 - Math.abs(lEyeSlant) / 0.04) * 100;
-    const rEyeSlantScore = clamp01(1 - Math.abs(rEyeSlant) / 0.04) * 100;
+    const lBrowLidScore = clamp01((lBrowToLid - 0.08) / 0.13) * 100;
+    const rBrowLidScore = clamp01((rBrowToLid - 0.08) / 0.13) * 100;
+    // 目尻の傾き: 0 が理想(ゆるい下がりは自然なので許容幅を広めに)
+    const lEyeSlantScore = clamp01(1 - Math.abs(lEyeSlant) / 0.09) * 100;
+    const rEyeSlantScore = clamp01(1 - Math.abs(rEyeSlant) / 0.09) * 100;
     // フェイスライン(頬下垂): 値が小さいほど良好
     const lJawScore = clamp01(1 - Math.max(0, lms[FM.CHEEK_L].y - eyeLineY) / scale / 0.62) * 100;
     const rJawScore = clamp01(1 - Math.max(0, lms[FM.CHEEK_R].y - eyeLineY) / scale / 0.62) * 100;
@@ -474,15 +480,20 @@ export function detectProblems(result, opts={}){
   const ref = getAgeRef(ageGroup);
   const out = [];
 
-  // 1. 左右非対称
-  if (m.asymmetryScore > 7 || Math.abs(m.midlineTilt) > 2.5){
+  // 1. 左右非対称 (斜め写真・照明差では過大評価されやすいので閾値と重症度を控えめに補正)
+  const yawBig = Math.abs(m.yawDeg || 0) > 12;
+  const asymThresh = yawBig ? 16 : 10;   // 斜めのときは基準を上げて誤検出を抑える
+  if (m.asymmetryScore > asymThresh || Math.abs(m.midlineTilt) > 3.5){
+    let asymSev = m.asymmetryScore > 24 ? 'high' : m.asymmetryScore > 15 ? 'mid' : 'low';
+    let note = '';
+    if (yawBig){ asymSev = asymSev === 'high' ? 'mid' : 'low'; note = '（斜め/角度の影響あり・参考値）'; }
     out.push({
       key:'facialAsymmetry',
-      severity: m.asymmetryScore > 15 ? 'high' : m.asymmetryScore > 10 ? 'mid' : 'low',
+      severity: asymSev,
       title:'顔の左右非対称',
       description:'目・眉・口角の高さに左右差が見られます。表情筋の使い方の偏り・噛み癖・寝姿勢が原因となりやすい状態です。',
       tissues:{ tight:['側頭筋(片側)','咬筋(片側)','広頸筋','胸鎖乳突筋'], weak:['口角挙筋(反対側)','大頬骨筋(反対側)','眼輪筋(下垂側)'] },
-      metric: `非対称スコア ${m.asymmetryScore.toFixed(1)} / 中心軸ズレ ${m.midlineTilt.toFixed(1)}°`,
+      metric: `非対称スコア ${m.asymmetryScore.toFixed(1)} / 中心軸ズレ ${m.midlineTilt.toFixed(1)}°${note}`,
     });
   }
   // 2. 口角下がり
@@ -508,14 +519,17 @@ export function detectProblems(result, opts={}){
     });
   }
   // 4. フェイスラインたるみ
-  if (m.jawSharpness < ref.sharpness[0] || m.cheekDrop > ref.cheekDrop[0]){
+  // 頬下垂 cheekDrop を主指標にする。jawSharpness(頬→顎の開き角)は絶対値が顔幅に強く依存し
+  // 年代別閾値(度スケール)の較正が難しいため、検出・重症度には使わず参考値として併記する。
+  if (m.cheekDrop > ref.cheekDrop[0]){
+    const midDrop = (ref.cheekDrop[0] + ref.cheekDrop[1]) / 2;
     out.push({
       key:'jawSagging',
-      severity: m.jawSharpness < ref.sharpness[1] ? 'high' : m.jawSharpness < ((ref.sharpness[0]+ref.sharpness[1])/2) ? 'mid' : 'low',
+      severity: m.cheekDrop > ref.cheekDrop[1] ? 'high' : m.cheekDrop > midDrop ? 'mid' : 'low',
       title:'フェイスラインのたるみ',
       description:'顎先から頬骨へのラインが鈍く、輪郭がぼやけている状態。広頸筋・咬筋の過緊張と、舌骨上筋群・首前面の弱化が要因。',
       tissues:{ tight:['広頸筋','咬筋','胸鎖乳突筋','側頭筋'], weak:['舌骨上筋群','顎二腹筋','頬筋','口角挙筋'] },
-      metric:`輪郭シャープネス ${m.jawSharpness.toFixed(1)} / 頬下垂 ${m.cheekDrop.toFixed(2)}`,
+      metric:`頬下垂 ${m.cheekDrop.toFixed(2)} / 輪郭角 ${m.jawSharpness.toFixed(0)}°`,
     });
   }
   // 5. むくみ
@@ -542,11 +556,11 @@ export function detectProblems(result, opts={}){
       metric:`三庭偏差 ${(triDev*100).toFixed(1)}% / 五眼指数 ${m.fiveEyesIdx.toFixed(2)}`,
     });
   }
-  // 7. NEW エラ張り
-  if (m.mandibleProminence > 0.92){
+  // 7. NEW エラ張り (下顎角は個人差が大きいので基準を上げ過検出を抑える)
+  if (m.mandibleProminence > 0.96){
     out.push({
       key:'masseterHypertrophy',
-      severity: m.mandibleProminence > 1.0 ? 'high' : m.mandibleProminence > 0.96 ? 'mid' : 'low',
+      severity: m.mandibleProminence > 1.05 ? 'high' : m.mandibleProminence > 1.0 ? 'mid' : 'low',
       title:'エラ張り(咬筋肥大)',
       description:'下顎角が頬骨より外側に張り出しています。噛みしめ・食いしばりで咬筋が肥大している可能性。',
       tissues:{ tight:['咬筋','側頭筋','内側翼突筋'], weak:['顎二腹筋','広頸筋','頬筋'] },
@@ -697,11 +711,19 @@ export function determineFaceType(problems, metrics){
 // ===================================================================
 export function calcScore(result, problems, opts={}){
   let score = 100;
+  let symptomPenalty = 0;
   problems.forEach(p => {
     if (p.key === 'general') return;
-    score -= p.severity === 'high' ? 16 : p.severity === 'mid' ? 9 : 4;
+    if (p.fromSymptom){
+      // 自己申告のお悩みは実測ではないため軽め、かつ合計に上限を設ける
+      symptomPenalty += 3;
+      return;
+    }
+    score -= p.severity === 'high' ? 13 : p.severity === 'mid' ? 8 : 3;
   });
-  return Math.max(35, Math.min(100, Math.round(score)));
+  score -= Math.min(12, symptomPenalty);
+  // 下限45(=Dでも「伸びしろ」の枠)。ふつうの顔はB〜Cに収まる較正。
+  return Math.max(45, Math.min(100, Math.round(score)));
 }
 
 export function gradeFromScore(score, opts={}){
@@ -709,11 +731,11 @@ export function gradeFromScore(score, opts={}){
   // 同年代でのおおよその percentile を推定(score → 上位%)
   const percentile = scoreToPercentile(score, ageGroup);
   let grade, desc;
-  if (score >= 90)      { grade='S'; desc='完成度の高い理想バランス。維持と予防が中心です。'; }
-  else if (score >= 80) { grade='A'; desc='良好。気になる箇所をピンポイントで整えれば完璧に。'; }
-  else if (score >= 70) { grade='B'; desc='伸びしろあり。表情筋トレで明確な変化が出る段階。'; }
-  else if (score >= 60) { grade='C'; desc='改善の好機。30日で見た目印象は変えられます。'; }
-  else                  { grade='D'; desc='優先的にケアが必要。まずは習慣化から始めましょう。'; }
+  if (score >= 90)      { grade='S'; desc='とても整ったバランス。今の良さを保つ維持トレが中心です。'; }
+  else if (score >= 80) { grade='A'; desc='良好なバランス。気になる所をピンポイントで整えるとさらに映えます。'; }
+  else if (score >= 70) { grade='B'; desc='伸びしろが大きい状態。表情筋トレで変化を実感しやすい段階です。'; }
+  else if (score >= 60) { grade='C'; desc='のびしろたっぷり。30日で見た目の印象は十分に変えられます。'; }
+  else                  { grade='D'; desc='今がスタートの好機。まずは1日数分の習慣から、変化を積み上げましょう。'; }
   return { grade, desc, percentile };
 }
 
@@ -753,11 +775,11 @@ export function buildMetricsList(result){
   }
 
   const items = [
-    { name:'中心軸の傾き', value:`${m.midlineTilt.toFixed(1)}°`, detail:'鼻ブリッジ→顎の垂直からのズレ', ...sev(m.midlineTilt,[1.5,3.5]) },
-    { name:'非対称スコア', value:m.asymmetryScore.toFixed(1), detail:'目・眉・口角の高さ差の総合', ...sev(m.asymmetryScore,[7,15]) },
+    { name:'中心軸の傾き', value:`${m.midlineTilt.toFixed(1)}°`, detail:'鼻ブリッジ→顎の垂直からのズレ', ...sev(m.midlineTilt,[2.5,5]) },
+    { name:'非対称スコア', value:m.asymmetryScore.toFixed(1), detail:'目・眉・口角の高さ差の総合', ...sev(m.asymmetryScore,[12,26]) },
     { name:'口角の位置', value: m.mouthCornerDrop > 0 ? `下垂 ${(m.mouthCornerDrop*100).toFixed(1)}` : `上向き ${(Math.abs(m.mouthCornerDrop)*100).toFixed(1)}`, detail:'下唇中央に対する口角の位置', ...sev(Math.max(0,m.mouthCornerDrop),[0.015,0.035]) },
     { name:'ほうれい線指数', value:m.nasolabialIndex.toFixed(3), detail:'鼻翼→口角の距離(大きいほど良好)', ...sev(Math.max(0,0.46-m.nasolabialIndex),[0.02,0.06]) },
-    { name:'輪郭シャープネス', value:m.jawSharpness.toFixed(1), detail:'頬骨→顎先のライン角度(大きいほど明瞭)', ...sev(Math.max(0,10-m.jawSharpness),[2,5]) },
+    { name:'フェイスラインの締まり', value:`${m.jawSharpness.toFixed(0)}°`, detail:'頬→顎の開き角(小さいほど締まり・大きいほどたるみ)。バーは頬下垂で評価', ...sev(Math.max(0, m.cheekDrop - 0.48),[0.07,0.14]) },
     { name:'顔の横/縦比', value:m.faceWHRatio.toFixed(2), detail:'理想 ≒ 0.67(小さいほど縦長・引き締まり)', ...sev(Math.max(0,m.faceWHRatio-0.7),[0.05,0.12]) },
     { name:'下顎プロミネンス', value:m.mandibleProminence.toFixed(2), detail:'頬骨幅に対する下顎角幅(大きい=エラ張り)', ...sev(Math.max(0,m.mandibleProminence-0.88),[0.05,0.10]) },
     { name:'頬コケ指数', value:m.cheekHollowIdx.toFixed(2), detail:'頬骨と頬輪郭の落差', ...sev(Math.max(0,m.cheekHollowIdx-0.15),[0.05,0.10]) },

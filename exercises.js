@@ -607,4 +607,38 @@ export const EXERCISES = {
     why:'笑顔は一瞬なら誰でも作れます。キープできる力がつくと、写真でも自然な笑顔が出せます。',
   },
 
+  // ============== 網羅性強化（v6.2 追加） ==============
+  earYoga: {
+    id:'earYoga', name:'耳ヨガ（引っぱって回す）', category:'training', kind:'stretch',
+    duration:'約1分', equipment:'なし', illustration: ICON.whole,
+    purpose:'耳を引っぱって回し、顔まわりの巡りを一気に良くします。むくみ・くすみ・こめかみのこわばりに。',
+    targets:['耳のまわり','こめかみ','顔全体の巡り'],
+    cues:{ do:'痛気持ちいい強さで、呼吸を続けて', dont:'痛いほど強く引っぱらない' },
+    why:'耳のまわりには血管やリンパが集まり、動かすと顔全体の巡りが上がります。手ぶらでどこでもできるのが利点です。',
+  },
+  oneSideRelease: {
+    id:'oneSideRelease', name:'硬い側をゆるめる（片側リリース）', category:'training', kind:'stretch',
+    duration:'約1分', equipment:'指', illustration: ICON.relax,
+    purpose:'左右差の「張っている側」だけを、こめかみ→エラ→首すじの順にゆるめます。噛み癖・片側の緊張リセットに。',
+    targets:['こめかみ（硬い側）','エラ（硬い側）','首すじ（硬い側）'],
+    cues:{ do:'硬いと感じる側だけ、多めに', dont:'痛いほど強く押さない' },
+    why:'左右差は「弱い側を鍛える」だけでなく「張っている側をゆるめる」と早く整います。噛み癖のある側は特に硬くなりがちです。',
+  },
+  faceLymphDrain: {
+    id:'faceLymphDrain', name:'顔リンパ流し（目の下→鎖骨）', category:'training', kind:'stretch',
+    duration:'約1分', equipment:'指', illustration: ICON.whole,
+    purpose:'目の下→耳の前→あご下→鎖骨の順に、むくみを流す道すじを追ってドレナージュします。',
+    targets:['目の下','耳の前','あご下','鎖骨'],
+    cues:{ do:'なでるだけの弱い圧で、最後は必ず鎖骨へ', dont:'強くこすらない（皮ふが薄い）' },
+    why:'顔のむくみは、最後に鎖骨のリンパ節へ流すのがコツ。道すじを追うことで水分・老廃物が抜けやすくなります。',
+  },
+  cornerDepressorRelease: {
+    id:'cornerDepressorRelease', name:'口角の下ゆるめ（への字ケア）', category:'training', kind:'stretch',
+    duration:'約1分', equipment:'指', illustration: ICON.relax,
+    purpose:'口角を下へ引っぱる筋肉（への字のもと）と、あご先の力みをゆるめます。口角下がり・梅干しジワに。',
+    targets:['口角の下','あご先'],
+    cues:{ do:'下から上へ、やさしく引き上げるように', dont:'あご先に力を入れて固めない' },
+    why:'口角下がりは「上げる筋肉が弱い」だけでなく「下げる筋肉が張っている」ことも一因。ゆるめると口角が上がりやすくなります。',
+  },
+
 };
