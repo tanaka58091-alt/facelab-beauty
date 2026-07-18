@@ -20,6 +20,7 @@ export const PRESCRIPTION_MAP = {
   gummySmile:      { training: ['upperLipTrain','mouthCornerLift','lipPucker','smileHold','symmetrySmile','cheekLift','aiueoTrain'] },
   hoodedEyelid:    { training: ['eyeWideOpen','binocularPose','browRaise','foreheadSmooth','hairlineLift','eyeRelease','lowerLidLift','blinkReset'] },
   droopyEyeOuter:  { training: ['outerEyeLift','binocularPose','eyeWideOpen','lowerLidLift','browRaise','eyeRelease','symmetrySmile'] },
+  longLowerFace:   { training: ['chinTuck','tonguePress','neckFront','chinPress','octopusPose','postureFace','mouthOpen','faceRelax'] },
   templeHollow:    { training: ['templeRelease','masseterRelease','browRaise','foreheadSmooth','faceMassage','faceRelax','hairlineLift'] },
   foreheadLines:   { training: ['foreheadSmooth','hairlineLift','browUpDown','browRaise','glabellaRelease','faceRelax','diaphragmBreath','templeRelease'] },
   glabellarLines:  { training: ['glabellaRelease','browUpDown','foreheadSmooth','faceRelax','diaphragmBreath','breathGlow','eyeRelease','templeRelease'] },

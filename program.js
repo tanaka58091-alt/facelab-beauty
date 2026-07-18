@@ -156,8 +156,9 @@ function pickLeastUsed(idList, usage, count, opts){
     if (lifeStageAvoid.has(id)) s += 0.6;
     // 履歴ベース: 改善が遅い問題向けの種目に弱い優先
     if (historyBoost[id]) s -= historyBoost[id];
-    // ストレッチには僅かペナルティ
-    if (isStretch(id)) s += 0.25;
+    // ストレッチには僅かペナルティ（ただし、その悩みの主力＝アンカーは免除。
+    // 例: エラ張りの主力「エラほぐし」等はゆるめる系でも優先配置する）
+    if (isStretch(id) && !anchors.has(id)) s += 0.25;
     // ゾーンバイアス
     s += zoneBias[meta.zone] || 0;
     // 季節フォーカスゾーンに僅か優先
