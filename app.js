@@ -8,7 +8,7 @@ import {
 import { EXERCISES, getMeta, CONTRA_LABEL, TIME_OF_DAY_LABEL, TOOLS_LABEL, PRESCRIPTION_MAP, isExerciseAllowed } from './exercises.js';
 import { pickTodayMenu, build30DayProgram } from './program.js';
 import { getKnowledgeFor } from './knowledge.js';
-import { buildMotionPlayerHTML, initMotionPlayer, buildStepPanelsHTML } from './motion.js';
+import { buildMotionPlayerHTML, initMotionPlayer, buildStepPanelsHTML, buildHowListHTML, MOTION_DEFS } from './motion.js';
 import {
   saveSnapshot, listSnapshots, clearHistory, deleteSnapshot,
   thumbnailFromCanvas, buildSnapshotMeta,
@@ -1358,8 +1358,8 @@ function openExerciseModal(ex){
   const contraBlock = contraChips ? `<div class="ex-contra-row"><span class="ex-contra-label">禁忌:</span>${contraChips}</div>` : '';
 
   els.modalBody.innerHTML = `
-    <div class="modal-ex-head">
-      <div class="modal-ex-illust">${ex.illustration}</div>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">${MOTION_DEFS}</svg>
+    <div class="modal-ex-head" style="display:block">
       <div class="modal-ex-info">
         <span class="ex-cat training">トレーニング</span>
         <h2>${ex.name}</h2>
@@ -1379,12 +1379,13 @@ function openExerciseModal(ex){
       ${buildStepPanelsHTML(ex.id)}
     </div>
     <div class="modal-section">
-      <h4>🎯 ターゲット筋</h4>
-      <ul>${ex.targets.map(t=>`<li>${t}</li>`).join('')}</ul>
+      <h4>📋 やり方（上の絵と同じ順番）</h4>
+      <p class="modal-section-sub">番号は上のイラストと対応しています。①の絵＝①の文です。</p>
+      ${buildHowListHTML(ex.id)}
     </div>
     <div class="modal-section">
-      <h4>📋 やり方</h4>
-      <ol>${ex.how.map(s=>`<li>${s}</li>`).join('')}</ol>
+      <h4>🎯 どこに効く？</h4>
+      <ul>${ex.targets.map(t=>`<li>${t}</li>`).join('')}</ul>
     </div>
     <div class="modal-section">
       <h4>✨ コツ</h4>

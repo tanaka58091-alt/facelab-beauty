@@ -24,15 +24,15 @@ const SEASON_BIAS = {
 };
 // 季節おすすめ種目 (やんわり優先)
 const SEASON_FAVORITE = {
-  spring: ['cheekPump','platysmaActivation','breathFace','fullFaceFlow','smileHold'],
-  summer: ['platysmaActivation','platysmaPlank','chinTuck','necklineStretch','jawlineSlide'],
-  autumn: ['breathFace','generalMaintain','tongueRotation','smileHold','postureLink'],
-  winter: ['eyeOpener','orbicularisLift','foreheadSmooth','breathFace','smileHold'],
+  spring: ['cheekPump','neckFront','breathGlow','fullFlow','faceRelax','bloodFlowPose','freshFacePose'],
+  summer: ['neckFront','chinTuck','jawSlide','neckSide','cheekAir','clavicleLymph','neckMassage','tongueOut'],
+  autumn: ['breathGlow','faceRelax','tongueRoll','fullFlow','postureFace','faceMassage','diaphragmBreath'],
+  winter: ['eyeWideOpen','foreheadSmooth','browRaise','breathGlow','templeRelease','bloodFlowPose','eyeRelease'],
 };
 // 月経・PMS期にはハード強度や息止め系を控えめに
 const LIFESTAGE_AVOID = {
-  menstrual:  ['platysmaPlank','breathFace'],
-  postpartum: ['platysmaPlank'],
+  menstrual:  ['breathGlow','aiueoTrain','lionPose','neckIso','bloodFlowPose'],
+  postpartum: ['breathGlow','lionPose','neckIso'],
 };
 
 const COUNT_BY_TIME = { 3:3, 5:4, 10:5, 15:6 };
@@ -49,12 +49,12 @@ const GOAL_ZONE_BIAS = {
 
 // goal → 「目的に合う」エクササイズID(優先プール)
 const GOAL_FAVORITE = {
-  liftup:    ['zygoLift','midfaceHold','antiGravityCheek','cheekPress','subZygoActivate','duchenneFocus','smileHold','cheekBoneIso'],
-  symmetry:  ['symmetryMirror','faceSymmetryDrill','unilateralSmile','winkAlternate','evenChewing','chewBalance','tonguePushSide','diagonalLift'],
-  antiAging: ['foreheadSmooth','glabellaRelease','foreheadIso','browLift','eyeOpener','orbicularisLift','outerEyeUp','smileGrading'],
-  shrink:    ['platysmaActivation','platysmaPlank','chinTuck','jawlineSlide','jawlineCarve','swallowDrill','cheekPump','necklineStretch'],
-  eyes:      ['eyeOpener','eyeWindowOpen','outerEyeUp','lowerEyelidLift','orbicularisLift','browLift','foreheadIso','winkAlternate'],
-  overall:   ['fullFaceFlow','duchenneFocus','smileHold','zygoLift','platysmaActivation','tongueRotation','postureLink','expressionPlay'],
+  liftup:    ['cheekLift','cheekLiftAssist','mouthCornerLift','nasolabialStretch','cheekPump','balloonFace','fullFlow','smileHold','chinUpPose'],
+  symmetry:  ['symmetrySmile','oneSideSmile','browSolo','chopstickTrain','aiueoTrain','balloonFace','mouthCornerTongue'],
+  antiAging: ['foreheadSmooth','glabellaRelease','hairlineLift','browUpDown','browRaise','eyeWideOpen','faceRelax','breathGlow','faceMassage'],
+  shrink:    ['chinTuck','chinPress','neckFront','octopusPose','jawSlide','cheekPump','masseterRelease','clavicleLymph','neckMassage'],
+  eyes:      ['eyeWideOpen','binocularPose','outerEyeLift','lowerLidLift','munchFace','eyeRelease','browRaise','eyeRoll'],
+  overall:   ['fullFlow','cheekLift','mouthCornerLift','tongueRoll','chinTuck','freshFacePose','smileHold','breathGlow'],
 };
 
 // 年代 → 強度のバイアス(高年齢は heavy にペナルティ、若年は heavy をやや優先)
@@ -72,15 +72,33 @@ function intensityPenalty(intensity, ageGroup){
   return 0.0;
 }
 
-// 問題キー → トレーニング候補プール
-function buildPool(problemKeys){
-  const pool = new Set();
+// 問題キー → 「悩みに直接効く」処方セット（score で強く優先される）
+function buildPrescribed(problemKeys){
+  const s = new Set();
   problemKeys.forEach(k => {
     const map = PRESCRIPTION_MAP[k] || PRESCRIPTION_MAP.general;
-    map.training.forEach(id => pool.add(id));
+    map.training.forEach(id => s.add(id));
   });
-  PRESCRIPTION_MAP.general.training.forEach(id => pool.add(id));
-  return Array.from(pool).filter(id => EXERCISES[id]);
+  PRESCRIPTION_MAP.general.training.forEach(id => s.add(id));
+  return s;
+}
+
+// 候補プール = 悩みへの処方セットが主役。
+// ただし「昨日と同じ種目」を避けるには1日分の2倍+αの候補が要るため、
+// 足りないぶんだけ全種目から補充する（オーダーメイド性と多様性の両立）。
+function buildPool(problemKeys, count=4, contra=[]){
+  const ok = (id) => EXERCISES[id] && isExerciseAllowed(id, contra);
+  const pool = new Set(Array.from(buildPrescribed(problemKeys)).filter(ok));
+  // 「昨日と同じ」を避けるには1日分の2倍+α、
+  // 「30日飽きない」には最低24種は欲しい（不足分は全種目から補充）
+  const need = Math.max(count * 2 + 2, 24);
+  if (pool.size < need){
+    for (const id of Object.keys(EXERCISES)){
+      if (pool.size >= need) break;
+      if (ok(id)) pool.add(id);
+    }
+  }
+  return Array.from(pool);
 }
 
 // アンカー: 優先キーの上位2 + 全キーの上位1
@@ -102,17 +120,20 @@ function buildAnchors(problemKeys, priorityKeys){
 
 // 軽量メニュー(アクティブレスト用)
 const REST_FRIENDLY = [
-  'tongueRotation','tongueUp','postureLink','smileHold',
-  'generalMaintain','mentalisRelief','swallowDrill','cheekToCheekAir',
-  'duchenneFocus','necklineStretch','breathFace','palateContact',
+  // 軽く流す日（Day7/14/21/28）向け＝ゆるめる・呼吸・整える系
+  'tongueRoll','tonguePress','postureFace','faceRelax','breathGlow','diaphragmBreath',
+  'cheekAir','neckSide','neckBack','neckMassage','clavicleLymph','shoulderRoll',
+  'mouthCornerLift','cheekPump','foreheadSmooth','glabellaRelease','templeRelease',
+  'masseterTap','lipPucker','lipRelease','eyeRelease','blinkReset','eyeRoll',
+  'chinMassage','cheekBoneMassage','faceMassage','hairlineLift','lipOpenClose',
 ];
 
 const isStretch = (id) => EXERCISES[id]?.kind === 'stretch';
 
 function pickLeastUsed(idList, usage, count, opts){
-  const { anchors, excludeIds=[], maxStretch=1, goal='overall', ageGroup='30s',
-          goalFavorites, contra=[], timeOfDay='any', season=null,
-          seasonFavorites=new Set(), lifeStageAvoid=new Set(), historyBoost={} } = opts;
+  const { anchors, excludeIds=[], avoidIds=[], maxStretch=1, goal='overall', ageGroup='30s',
+          goalFavorites, prescribed=new Set(), contra=[], timeOfDay='any', season=null,
+          seasonFavorites=new Set(), lifeStageAvoid=new Set(), historyBoost={}, phase=1 } = opts;
   const zoneBias = GOAL_ZONE_BIAS[goal] || GOAL_ZONE_BIAS.overall;
   const seasonBias = season && SEASON_BIAS[season] ? SEASON_BIAS[season] : null;
 
@@ -125,6 +146,8 @@ function pickLeastUsed(idList, usage, count, opts){
     let s = usage[id] || 0;
     // アンカー: 強い優先
     if (anchors.has(id)) s -= 0.5;
+    // 悩みに直接効く処方種目を優先（オーダーメイドの核）
+    if (prescribed.has(id)) s -= 0.45;
     // ゴール好みのリスト
     if (goalFavorites.has(id)) s -= 0.35;
     // 季節おすすめ
@@ -147,9 +170,20 @@ function pickLeastUsed(idList, usage, count, opts){
     }
     // 年代別強度ペナルティ
     s += intensityPenalty(meta.intensity, ageGroup);
-    // tier 1 を僅か優先
-    if (meta.tier === 1) s -= 0.05;
-    if (meta.tier === 3) s += 0.05;
+    // フェーズごとに主役の tier を入れ替える
+    //   Phase1=基礎を覚える / Phase2=標準を足す / Phase3=応用で仕上げる
+    //   → 30日を通して顔ぶれが変わり、飽きずに段階的にレベルが上がる
+    if (phase === 1){
+      if (meta.tier === 1) s -= 0.55;
+      if (meta.tier === 3) s += 0.5;
+    } else if (phase === 2){
+      if (meta.tier === 2) s -= 0.4;
+      if (meta.tier === 3) s -= 0.1;
+    } else {
+      if (meta.tier === 3) s -= 0.5;
+      if (meta.tier === 2) s -= 0.2;
+      if (meta.tier === 1) s += 0.25;
+    }
     return s;
   };
 
@@ -161,28 +195,26 @@ function pickLeastUsed(idList, usage, count, opts){
     return aa - ab;
   };
 
-  const primary = idList.filter(id => !excludeIds.includes(id)).sort(sortFn);
   const picked = [];
   let stretchCount = 0;
-  for (const id of primary){
-    if (picked.length >= count) break;
-    if (isStretch(id)){
-      if (stretchCount >= maxStretch) continue;
-      stretchCount++;
-    }
-    picked.push(id);
-  }
-  if (picked.length < count){
-    const fallback = idList.filter(id => !picked.includes(id)).sort(sortFn);
-    for (const id of fallback){
+  const takeFrom = (list) => {
+    for (const id of list){
       if (picked.length >= count) break;
+      if (picked.includes(id)) continue;
       if (isStretch(id)){
         if (stretchCount >= maxStretch) continue;
         stretchCount++;
       }
       picked.push(id);
     }
-  }
+  };
+  // 段階的に条件を緩める（「昨日と同じ種目」は最後まで避ける = 飽きさせない）
+  // 1) 過去2日に出た種目を避ける
+  takeFrom(idList.filter(id => !excludeIds.includes(id)).sort(sortFn));
+  // 2) 足りなければ、一昨日は許容。昨日の種目だけは避ける
+  if (picked.length < count) takeFrom(idList.filter(id => !avoidIds.includes(id)).sort(sortFn));
+  // 3) それでも足りなければ全体から（候補が1日分の2倍未満の極小プール時のみ）
+  if (picked.length < count) takeFrom(idList.slice().sort(sortFn));
   return picked.map(id => EXERCISES[id]).filter(Boolean);
 }
 
@@ -208,15 +240,15 @@ export function build30DayProgram(problemKeys, opts={}){
   } = opts;
 
   const count = COUNT_BY_TIME[timeBudget] || 4;
-  let pool = buildPool(problemKeys);
-  // 禁忌種目は完全除外
-  pool = pool.filter(id => isExerciseAllowed(id, contra));
+  // 禁忌種目を除外しつつ、重複回避に必要な数まで候補を確保
+  const pool = buildPool(problemKeys, count, contra);
+  const prescribed = buildPrescribed(problemKeys);
   const anchors = buildAnchors(problemKeys, priorityKeys);
   const goalFavorites = new Set(GOAL_FAVORITE[goal] || GOAL_FAVORITE.overall);
   const seasonFavorites = new Set(season ? (SEASON_FAVORITE[season] || []) : []);
   const lifeStageAvoid = new Set(LIFESTAGE_AVOID[lifeStage] || []);
   const historyBoost = buildHistoryBoost(history, problemKeys);
-  const restPool = pool.filter(id => REST_FRIENDLY.includes(id));
+  const restPool = REST_FRIENDLY.filter(id => EXERCISES[id] && isExerciseAllowed(id, contra));
   const usage = Object.fromEntries(pool.map(id => [id, 0]));
 
   const days = [];
@@ -227,16 +259,15 @@ export function build30DayProgram(problemKeys, opts={}){
 
     const prev1 = days[days.length - 1];
     const prev2 = days[days.length - 2];
-    const prevIds = [
-      ...(prev1 ? (prev1.training || []).map(e => e.id) : []),
-      ...(prev2 ? (prev2.training || []).map(e => e.id) : []),
-    ];
+    const prev1Ids = prev1 ? (prev1.training || []).map(e => e.id) : [];
+    const prev2Ids = prev2 ? (prev2.training || []).map(e => e.id) : [];
+    const prevIds = [...prev1Ids, ...prev2Ids];
 
     const sourceList = isRest && restPool.length >= count ? restPool : pool;
     const dayCount = isRest ? Math.max(3, count - 1) : count;
     const training = pickLeastUsed(sourceList, usage, dayCount, {
-      anchors, excludeIds: prevIds, maxStretch: 1,
-      goal, ageGroup, goalFavorites,
+      anchors, excludeIds: prevIds, avoidIds: prev1Ids, maxStretch: 2, phase,
+      goal, ageGroup, goalFavorites, prescribed,
       contra, timeOfDay, season, seasonFavorites, lifeStageAvoid, historyBoost,
     });
     training.forEach(ex => { usage[ex.id] = (usage[ex.id] || 0) + 1; });
