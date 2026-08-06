@@ -405,6 +405,8 @@ function setupFileInput(){
       preview.hidden = false;
       state.imgFace = img;
       updateAnalyzeBtn();
+      // 入力中の1〜2分を使ってAIモデル(約13MB)を裏で先読み → 解析ボタンで待たせない
+      preloadLandmarker();
     };
     img.src = url;
   });
@@ -423,35 +425,53 @@ function collectSymptoms(){
 // ===================================================================
 // MEDIAPIPE FACE LANDMARKER
 // ===================================================================
-async function loadLandmarker(){
-  if (state.landmarker) return state.landmarker;
+// モデル読み込みの実体（UIを触らない純粋な処理）
+async function createLandmarker(){
+  const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
+  const fileset = await vision.FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm'
+  );
+  return vision.FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: {
+      modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+      delegate: 'GPU',
+    },
+    runningMode: 'IMAGE',
+    numFaces: 1,
+    minFaceDetectionConfidence: 0.5,
+    minFacePresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+    outputFacialTransformationMatrixes: false,
+    outputFaceBlendshapes: false,
+  });
+}
+
+// メモ化promiseで多重呼び出しを1本化。
+// 写真選択時に silent:true で先読みしておくと、解析ボタンを押した時には
+// モデル(約13MB)のダウンロードが終わっていて待ちゼロで解析が始まる。
+let _landmarkerPromise = null;
+async function loadLandmarker({ silent = false } = {}){
+  if (state.landmarker) return state.landmarker;   // 取得済み(テストスタブ含む)
+  if (!_landmarkerPromise){
+    _landmarkerPromise = createLandmarker();
+  }
   try {
-    setLoader('AIモデルを読み込んでいます…（初回は10〜20秒ほどかかります）');
-    const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
-    const fileset = await vision.FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm'
-    );
-    setLoader('顔ランドマーク推定モデル(468点)を初期化中…');
-    state.landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: {
-        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-        delegate: 'GPU',
-      },
-      runningMode: 'IMAGE',
-      numFaces: 1,
-      minFaceDetectionConfidence: 0.5,
-      minFacePresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-      outputFacialTransformationMatrixes: false,
-      outputFaceBlendshapes: false,
-    });
-    return state.landmarker;
+    const lm = await _landmarkerPromise;
+    state.landmarker = lm;
+    return lm;
   } catch (e){
-    // 通信不良・CDN制限・オフライン等でモデル取得に失敗
+    _landmarkerPromise = null;   // 失敗はリセットして次回(ボタン押下時)に再試行できるように
+    if (silent) throw e;         // 先読み失敗は呼び出し元で握りつぶす
     const err = new Error('MODEL_LOAD_FAILED');
     err.cause = e;
     throw err;
   }
+}
+
+// 写真を選んだ瞬間に裏で先読み開始（悩み・ヒアリング入力中にDLが終わる）。
+// 失敗しても何も出さない（解析ボタン押下時に通常経路で再試行される）。
+function preloadLandmarker(){
+  loadLandmarker({ silent: true }).catch(() => {});
 }
 
 async function detectFace(image){
@@ -479,7 +499,10 @@ function hideLoader(){
 // ===================================================================
 els.btnAnalyze.addEventListener('click', async () => {
   try {
-    setLoader('顔写真を解析中… 468点のランドマークを検出しています');
+    // 先読みが済んでいれば即解析。まだならモデル読み込み中である旨を正直に表示
+    setLoader(state.landmarker
+      ? '顔写真を解析中… 468点のランドマークを検出しています'
+      : 'AIの準備をしています…（初回のみ・少し時間がかかります）');
     const lms = await detectFace(state.imgFace);
     if (!lms){
       alert('顔を検出できませんでした。正面でピントの合った写真をご使用ください。');
