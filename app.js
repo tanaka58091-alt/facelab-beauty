@@ -413,7 +413,39 @@ function setupFileInput(){
 }
 setupFileInput();
 
-function updateAnalyzeBtn(){ els.btnAnalyze.disabled = !state.imgFace; }
+function updateAnalyzeBtn(){ els.btnAnalyze.disabled = !state.imgFace; updateStickyCta(); }
+
+// ===== スティッキー解析CTA =====
+// 写真→解析ボタンはスマホで約3.6画面分離れている(70入力項目が間にある)ため、
+// 写真選択後は画面下に固定ボタンを出して、どこからでも1タップで解析できるようにする。
+// 表示条件: 写真あり・未解析(結果非表示)・ローダー非表示・本物のボタンが画面外・ゲート非表示
+const stickyCta = document.getElementById('sticky-cta');
+// 本物の解析ボタンが画面内にあるか(重複表示の回避)。IntersectionObserverは
+// 環境により発火しないことがあるため、rect直接計算＋scrollイベントで確実に判定する。
+function isAnalyzeBtnInView(){
+  const r = els.btnAnalyze.getBoundingClientRect();
+  return r.top < window.innerHeight - 10 && r.bottom > 0;
+}
+function updateStickyCta(){
+  if (!stickyCta) return;
+  const gate = document.getElementById('signin-gate');
+  const gateOpen = !!(gate && !gate.hidden);
+  const show = !!state.imgFace && els.results.hidden && els.loader.hidden
+            && !els.btnAnalyze.disabled && !isAnalyzeBtnInView() && !gateOpen;
+  stickyCta.hidden = !show;
+}
+// スロットルは setTimeout を使用(requestAnimationFrame は WebView 等で
+// 発火しない環境があり、詰まると以後の更新が全て止まるため)
+let _ctaTick = false;
+function _ctaOnScroll(){
+  if (_ctaTick) return;
+  _ctaTick = true;
+  setTimeout(() => { _ctaTick = false; updateStickyCta(); }, 120);
+}
+window.addEventListener('scroll', _ctaOnScroll, { passive: true });
+window.addEventListener('resize', _ctaOnScroll, { passive: true });
+const _stickyBtn = document.getElementById('sticky-analyze');
+if (_stickyBtn) _stickyBtn.addEventListener('click', () => els.btnAnalyze.click());
 
 function collectSymptoms(){
   state.symptoms = Array.from(
@@ -488,10 +520,12 @@ function setLoader(text){
   els.loader.hidden = false;
   els.loaderText.textContent = text;
   els.btnAnalyze.disabled = true;
+  updateStickyCta();
 }
 function hideLoader(){
   els.loader.hidden = true;
   els.btnAnalyze.disabled = false;
+  updateStickyCta();
 }
 
 // ===================================================================
@@ -568,6 +602,7 @@ els.btnAnalyze.addEventListener('click', async () => {
     hideLoader();
     els.results.hidden = false;
     els.results.classList.add('fade-in');
+    updateStickyCta();
     setTimeout(() => els.results.scrollIntoView({behavior:'smooth', block:'start'}), 100);
 
   } catch (e){
@@ -650,6 +685,7 @@ async function restoreLastSession(){
   renderAll();
   els.results.hidden = false;
   els.results.classList.add('fade-in');
+  updateStickyCta();
   setTimeout(() => els.results.scrollIntoView({ behavior:'smooth', block:'start' }), 100);
 }
 
@@ -1052,6 +1088,7 @@ function enterApp(){
   applyUserPrefsToForm();
   renderProgress();
   renderResumeBanner();
+  updateStickyCta();
 }
 
 // ゲート表示（email入力 / PINロック）
@@ -1061,6 +1098,7 @@ function showSigninGate(mode, acc){
   if (!gate || !body) return;
   gate.hidden = false;
   document.body.style.overflow = 'hidden';
+  updateStickyCta();
 
   if (mode === 'pin'){
     body.innerHTML = `
@@ -1787,6 +1825,7 @@ function uiAlert({ title, message }){
 
 els.btnRestart.addEventListener('click', () => {
   els.results.hidden = true;
+  updateStickyCta();
   document.getElementById('upload-section').scrollIntoView({behavior:'smooth'});
 });
 els.btnPrint.addEventListener('click', () => window.print());
