@@ -393,6 +393,8 @@ function setupFileInput(){
   });
 
   input.addEventListener('change', () => {
+    // ドラッグ&ドロップ等でのすり抜け防止: 未サインインなら保存先が無いためゲートへ
+    if (!isSignedIn()){ input.value = ''; showSigninGate('email'); return; }
     const f = input.files[0]; if (!f) return;
     const url = URL.createObjectURL(f);
     const img = new Image();
@@ -532,6 +534,7 @@ function hideLoader(){
 // ANALYZE FLOW
 // ===================================================================
 els.btnAnalyze.addEventListener('click', async () => {
+  if (!isSignedIn()){ showSigninGate('email'); return; }
   try {
     // 先読みが済んでいれば即解析。まだならモデル読み込み中である旨を正直に表示
     setLoader(state.landmarker
@@ -1074,15 +1077,38 @@ function initAuthGate(){
     if (acc && accountHasPin(acc.id)){ showSigninGate('pin', acc); }
     else { enterApp(); }
   } else {
-    showSigninGate('email');
+    // 未サインインでもランディング(価値説明)は見られるようにし、
+    // 「診断を始める瞬間」(写真選択)にゲートを出す。個人データは従来どおりサインイン後のみ。
+    renderSignedOutState();
   }
 }
+
+// 未サインイン状態: アカウントバーを隠し、サインイン案内バーを表示
+function renderSignedOutState(){
+  const bar = document.getElementById('account-bar');
+  if (bar) bar.hidden = true;
+  const prompt = document.getElementById('signin-prompt');
+  if (prompt) prompt.hidden = false;
+  updateStickyCta();
+}
+// 案内バーのボタン → ゲートを開く
+const _signinPromptBtn = document.getElementById('signin-prompt-btn');
+if (_signinPromptBtn) _signinPromptBtn.addEventListener('click', () => showSigninGate('email'));
+// 写真選択(タップ)をサインインの発動点に: 未サインインならファイル選択を開かずゲート表示
+const _uploadLabel = document.querySelector('label[data-target="file-face"]');
+if (_uploadLabel) _uploadLabel.addEventListener('click', (e) => {
+  if (!isSignedIn()){ e.preventDefault(); showSigninGate('email'); }
+}, true);
 
 // サインイン後にアプリ本体を初期化・表示
 function enterApp(){
   const gate = document.getElementById('signin-gate');
   if (gate) gate.hidden = true;
   document.body.style.overflow = '';
+  const bar = document.getElementById('account-bar');
+  if (bar) bar.hidden = false;
+  const prompt = document.getElementById('signin-prompt');
+  if (prompt) prompt.hidden = true;
   initAccountBar();
   loadUserPrefs();
   applyUserPrefsToForm();
@@ -1118,11 +1144,12 @@ function showSigninGate(mode, acc){
     setTimeout(() => document.getElementById('signin-pin')?.focus(), 40);
   } else {
     body.innerHTML = `
-      <p class="signin-lead">メールアドレスで、あなた専用のページに入ります。</p>
+      <p class="signin-lead">診断結果と30日プログラムを<strong>あなた専用に保存する</strong>ため、<br>メールアドレスでサインインします。</p>
       <input type="email" class="signin-input" id="signin-email" placeholder="メールアドレス" autocomplete="email" />
       <input type="text" class="signin-input" id="signin-name" placeholder="お名前（任意）" autocomplete="name" />
       <div class="signin-err" id="signin-err" hidden></div>
       <button class="signin-submit" id="signin-go" type="button">はじめる / ログイン</button>
+      <button class="signin-alt" id="signin-later" type="button">← 先にページを見る</button>
       <p class="signin-note">※ データはこの端末の中だけに保存されます（外部送信なし・別の端末には移りません）。共有端末の方はログイン後に「🔒 PIN設定」をおすすめします。</p>`;
     const go = () => {
       const email = document.getElementById('signin-email').value;
@@ -1135,6 +1162,13 @@ function showSigninGate(mode, acc){
     };
     document.getElementById('signin-go').addEventListener('click', go);
     document.getElementById('signin-name').addEventListener('keydown', ev => { if (ev.key === 'Enter') go(); });
+    // 「先にページを見る」: 未サインインのままランディングへ戻る(個人データは表示されないので安全)
+    const later = document.getElementById('signin-later');
+    if (later) later.addEventListener('click', () => {
+      gate.hidden = true;
+      document.body.style.overflow = '';
+      renderSignedOutState();
+    });
     setTimeout(() => document.getElementById('signin-email')?.focus(), 40);
   }
 }
@@ -1161,6 +1195,14 @@ function initAccountBar(){
     signOut();
     if (els.results) els.results.hidden = true;
     if (els.baStage) els.baStage.hidden = true;
+    // 共有端末対策: 前の人の写真プレビュー・前回診断バナーを画面から消す
+    state.imgFace = null;
+    if (els.previewFace) els.previewFace.hidden = true;
+    if (els.fileFace) els.fileFace.value = '';
+    const rb = document.getElementById('resume-banner');
+    if (rb){ rb.hidden = true; rb.innerHTML = ''; }
+    updateAnalyzeBtn();
+    renderSignedOutState();
     showSigninGate('email');
   });
 
