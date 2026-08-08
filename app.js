@@ -542,8 +542,21 @@ els.btnAnalyze.addEventListener('click', async () => {
       : 'AIの準備をしています…（初回のみ・少し時間がかかります）');
     const lms = await detectFace(state.imgFace);
     if (!lms){
-      alert('顔を検出できませんでした。正面でピントの合った写真をご使用ください。');
       hideLoader();
+      // 行き止まりにしない: 原因のチェックリスト+その場で写真を選び直せる導線を出す
+      const reselect = await uiConfirm({
+        title: '顔を見つけられませんでした',
+        message: `写真の条件が原因のことがほとんどで、<strong>あなたの顔のせいではありません</strong>。<br>次の4点をチェックして、もう一度お試しください：
+          <ul style="margin:10px 0 0; padding-left:20px; line-height:2;">
+            <li>💡 <strong>明るい場所</strong>で（逆光・夜の室内はNG）</li>
+            <li>😐 <strong>正面</strong>を向く（斜め・うつむきはNG）</li>
+            <li>🔍 顔が<strong>画面に大きく</strong>写るように</li>
+            <li>👓 <strong>メガネ・前髪・マスク</strong>は外して</li>
+          </ul>`,
+        okText: '写真を選び直す',
+        cancelText: '閉じる',
+      });
+      if (reselect && els.fileFace) els.fileFace.click();  // その場でファイル選択を再オープン
       return;
     }
     state.result = analyzeFace(lms, { image: state.imgFace });
@@ -610,12 +623,18 @@ els.btnAnalyze.addEventListener('click', async () => {
 
   } catch (e){
     console.error(e);
-    if (e && e.message === 'MODEL_LOAD_FAILED'){
-      alert('AIモデルの読み込みに失敗しました。\n\n通信環境（Wi-Fi・モバイル回線）をご確認のうえ、もう一度「顔を解析する」を押してください。社内ネットワーク等で通信が制限されている場合は、別の回線でお試しください。');
-    } else {
-      alert('解析中にエラーが発生しました。もう一度お試しください。\n\n' + (e && e.message ? e.message : ''));
-    }
     hideLoader(); // ボタンを再度押せる状態に戻す（＝再試行できる）
+    if (e && e.message === 'MODEL_LOAD_FAILED'){
+      const retry = await uiConfirm({
+        title: 'AIの準備ができませんでした',
+        message: `通信環境（Wi-Fi・モバイル回線）をご確認のうえ、もう一度お試しください。<br><small>社内ネットワーク等で通信が制限されている場合は、別の回線でお試しください。</small>`,
+        okText: 'もう一度試す',
+        cancelText: '閉じる',
+      });
+      if (retry) els.btnAnalyze.click();  // 1タップで再試行
+    } else {
+      uiAlert({ title: '解析中にエラーが発生しました', message: `もう一度お試しください。<br><small>${escapeHtml(e && e.message ? e.message : '')}</small>` });
+    }
   }
 });
 
@@ -1832,7 +1851,7 @@ function uiPrompt({ title, label='', value='', placeholder='', okText='決定' }
     input.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); ok(); } });
   });
 }
-function uiConfirm({ title, message, okText='実行', danger=false }){
+function uiConfirm({ title, message, okText='実行', cancelText='キャンセル', danger=false }){
   return new Promise(resolve => {
     _dialogResolve = (v) => resolve(v === true);
     els.modalBody.innerHTML = `
@@ -1840,7 +1859,7 @@ function uiConfirm({ title, message, okText='実行', danger=false }){
         <h3>${escapeHtml(title)}</h3>
         <p class="ui-dialog-msg">${message}</p>
         <div class="ui-dialog-actions">
-          <button class="btn-ghost" id="ui-cancel" type="button">キャンセル</button>
+          <button class="btn-ghost" id="ui-cancel" type="button">${escapeHtml(cancelText)}</button>
           <button class="btn-primary${danger ? ' danger' : ''}" id="ui-ok" type="button">${escapeHtml(okText)}</button>
         </div>
       </div>`;
