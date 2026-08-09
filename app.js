@@ -1619,6 +1619,39 @@ function renderToday(){
   if (els.todayReason && today.reason){
     els.todayReason.innerHTML = `<span class="reason-title">🎯 なぜ今日この${today.training.length}種なのか（Day ${dayNum}）</span>${escapeHtml(today.reason)}`;
   }
+  // ガイドフロー開始ボタン(renderTodayは何度も走るため onclick 代入でリスナー多重を防ぐ)
+  const btnFlow = document.getElementById('btn-today-flow');
+  if (btnFlow){
+    btnFlow.hidden = false;
+    btnFlow.onclick = () => startTodayFlow(today.training.map(e => e.id), dayNum);
+  }
+}
+
+// ===== 今日のトレーニング・ガイドフロー =====
+// 「次へ」を押すだけで今日の全種目を順番に実行→最後にDay完了を自動記録。
+// 途中で×で閉じれば通常表示に戻る(強制なし)。カード個別タップの挙動は不変。
+let _todayFlow = null;   // { ids:[], idx, dayNum }
+function startTodayFlow(ids, dayNum){
+  if (!ids || !ids.length) return;
+  _todayFlow = { ids, idx: 0, dayNum };
+  openExerciseModal(EXERCISES[ids[0]]);
+}
+function finishTodayFlow(){
+  const dayNum = _todayFlow?.dayNum;
+  _todayFlow = null;
+  closeModal();
+  if (dayNum == null) return;
+  markDayDone(dayNum);
+  renderToday();                       // 次のDayへ進む
+  renderProgram(state.currentPhase);   // プログラム側の✓も更新
+  const st = journeyStats();
+  uiAlert({
+    title: `Day ${dayNum} 完了！おつかれさまでした 🎉`,
+    message: `🔥 連続 <strong>${st.streak}日</strong> ・ 達成 <strong>${st.doneCount}/30</strong><br>${
+      st.doneCount >= 30 ? '30日プログラム達成！本当にすごいです 🌸'
+      : st.streak >= 7 ? '1週間継続中！顔は毎日の積み重ねで変わります 🌷'
+      : '明日もホーム画面の桜アイコンからワンタップで続けましょう 🌸'}`,
+  });
 }
 
 // 継続の仕組み: Day進行・連続日数・30マス進捗・完了ボタン
@@ -1782,6 +1815,26 @@ function openExerciseModal(ex){
       <p>${ex.why}</p>
     </div>
   `;
+  // ガイドフロー中: 進捗と「次の種目へ」ナビを下部に固定表示
+  if (_todayFlow && _todayFlow.ids[_todayFlow.idx] === ex.id){
+    const total = _todayFlow.ids.length;
+    const isLast = _todayFlow.idx === total - 1;
+    els.modalBody.insertAdjacentHTML('beforeend', `
+      <div class="flow-nav">
+        <span class="flow-progress">種目 ${_todayFlow.idx + 1} / ${total}</span>
+        <button class="flow-next${isLast ? ' is-last' : ''}" id="flow-next" type="button">
+          ${isLast ? '今日の分をすべて完了 🎉' : 'できたら、次の種目へ →'}
+        </button>
+      </div>`);
+    document.getElementById('flow-next').addEventListener('click', () => {
+      if (!_todayFlow) return;
+      if (_todayFlow.idx >= _todayFlow.ids.length - 1){ finishTodayFlow(); return; }
+      _todayFlow.idx++;
+      openExerciseModal(EXERCISES[_todayFlow.ids[_todayFlow.idx]]);
+      const panel = document.querySelector('.modal-panel');
+      if (panel) panel.scrollTop = 0;   // 次の種目は先頭から読めるように
+    });
+  }
   showModal();
   // アニメは <details> を開いたとき初回だけ生成・初期化（遅延ロード）
   const anim = els.modalBody.querySelector('.step-anim');
@@ -1823,7 +1876,7 @@ function openDayModal(d){
   showModal();
 }
 function showModal(){ els.modal.hidden = false; document.body.style.overflow = 'hidden'; }
-function closeModal(){ els.modal.hidden = true; document.body.style.overflow = ''; settleDialog(DIALOG_CANCEL); }
+function closeModal(){ els.modal.hidden = true; document.body.style.overflow = ''; settleDialog(DIALOG_CANCEL); _todayFlow = null; }
 els.modal.addEventListener('click', e => { if (e.target.matches('[data-close]')) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key==='Escape' && !els.modal.hidden) closeModal(); });
 

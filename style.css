@@ -1876,3 +1876,34 @@ body{
   font-size:14.5px; font-weight:700; border:none; border-radius:12px; cursor:pointer;
   box-shadow:0 4px 14px rgba(224,122,138,.3); font-family:inherit;
 }
+
+/* ===== 今日のトレーニング・ガイドフロー ===== */
+.today-flow-btn{
+  display:block; width:100%; margin:0 0 18px; padding:16px 20px;
+  background:linear-gradient(120deg, var(--brand), var(--brand-2)); color:#fff;
+  border:none; border-radius:14px; cursor:pointer; text-align:center;
+  font-size:16px; font-weight:700; font-family:inherit;
+  box-shadow:0 6px 18px rgba(224,122,138,.32); transition:filter .15s, transform .1s;
+}
+.today-flow-btn:hover{ filter:brightness(1.05); }
+.today-flow-btn:active{ transform:translateY(1px); }
+.today-flow-btn small{ display:block; margin-top:4px; font-size:11.5px; font-weight:500; opacity:.92; }
+.flow-nav{
+  position:sticky; bottom:-1px; z-index:5;
+  display:flex; align-items:center; gap:14px;
+  margin:22px -8px -8px; padding:12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  background:linear-gradient(180deg, rgba(255,255,255,0), #fff 30%);
+  border-top:1px solid var(--brand-soft);
+}
+.flow-progress{
+  flex:none; font-size:12.5px; font-weight:700; color:var(--brand);
+  background:var(--brand-soft); padding:7px 13px; border-radius:999px; white-space:nowrap;
+}
+.flow-next{
+  flex:1; padding:14px 18px; border:none; border-radius:999px; cursor:pointer;
+  background:linear-gradient(120deg, var(--brand), var(--brand-2)); color:#fff;
+  font-size:14.5px; font-weight:700; font-family:inherit;
+  box-shadow:0 4px 14px rgba(224,122,138,.3); transition:filter .15s;
+}
+.flow-next:hover{ filter:brightness(1.05); }
+.flow-next.is-last{ background:linear-gradient(120deg, #E8A33B, #F0C04F); box-shadow:0 4px 14px rgba(232,163,59,.35); }
