@@ -619,6 +619,7 @@ els.btnAnalyze.addEventListener('click', async () => {
     els.results.hidden = false;
     els.results.classList.add('fade-in');
     updateStickyCta();
+    renderInstallPromo();
     setTimeout(() => els.results.scrollIntoView({behavior:'smooth', block:'start'}), 100);
 
   } catch (e){
@@ -708,6 +709,7 @@ async function restoreLastSession(){
   els.results.hidden = false;
   els.results.classList.add('fade-in');
   updateStickyCta();
+  renderInstallPromo();
   setTimeout(() => els.results.scrollIntoView({ behavior:'smooth', block:'start' }), 100);
 }
 
@@ -1890,6 +1892,65 @@ els.btnRestart.addEventListener('click', () => {
   document.getElementById('upload-section').scrollIntoView({behavior:'smooth'});
 });
 els.btnPrint.addEventListener('click', () => window.print());
+
+// ===================================================================
+// PWA — Service Worker登録 & 「ホーム画面に追加」案内
+//   SWはCDN資産のみキャッシュ(アプリ本体は非キャッシュ=更新即時)。
+//   案内は解析完了後(満足度が最も高い瞬間)に一度だけ。×で以後表示しない。
+// ===================================================================
+if ('serviceWorker' in navigator){
+  try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch(e){}
+}
+
+const INSTALL_PROMO_KEY = 'facelab.installPromo.v1';
+let _deferredInstall = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstall = e;      // Androidはワンタップインストールに切替
+  renderInstallPromo();
+});
+function isStandaloneApp(){
+  try {
+    return (window.matchMedia && matchMedia('(display-mode: standalone)').matches)
+        || window.navigator.standalone === true;
+  } catch(e){ return false; }
+}
+function renderInstallPromo(){
+  const host = document.getElementById('install-promo');
+  if (!host) return;
+  let flag = null;
+  try { flag = localStorage.getItem(INSTALL_PROMO_KEY); } catch(e){}
+  // 表示条件: 未解析でない(結果表示中)・未インストール・まだ閉じられていない
+  if (flag || isStandaloneApp() || !els.results || els.results.hidden){ host.hidden = true; return; }
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const action = _deferredInstall
+    ? `<button class="ip-btn" id="ip-install" type="button">📲 ホーム画面に追加する</button>`
+    : isIOS
+      ? `<div class="ip-steps">① 画面下の<strong>共有ボタン（□に↑）</strong>をタップ → ②「<strong>ホーム画面に追加</strong>」を選ぶだけ</div>`
+      : `<div class="ip-steps">ブラウザのメニュー（⋮）から「<strong>ホーム画面に追加</strong>／アプリをインストール」を選べます</div>`;
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="ip-head">
+      <span class="ip-title">📲 ホーム画面に追加して、毎日ワンタップ</span>
+      <button class="ip-close" id="ip-close" type="button" aria-label="今後表示しない">×</button>
+    </div>
+    <p class="ip-sub">30日プログラムは毎日の続きが命。桜のアイコンから1タップで「今日のメニュー」に戻れます。</p>
+    ${action}`;
+  const close = document.getElementById('ip-close');
+  if (close) close.addEventListener('click', () => {
+    try { localStorage.setItem(INSTALL_PROMO_KEY, 'dismissed'); } catch(e){}
+    host.hidden = true;
+  });
+  const btn = document.getElementById('ip-install');
+  if (btn) btn.addEventListener('click', async () => {
+    if (!_deferredInstall) return;
+    _deferredInstall.prompt();
+    try { await _deferredInstall.userChoice; } catch(e){}
+    _deferredInstall = null;
+    try { localStorage.setItem(INSTALL_PROMO_KEY, 'done'); } catch(e){}
+    host.hidden = true;
+  });
+}
 
 // ===== 法的情報モーダル（プライバシー/利用規約/免責） =====
 const LEGAL = {
