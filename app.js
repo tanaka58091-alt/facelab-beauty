@@ -480,8 +480,12 @@ async function createLandmarker(){
     minFaceDetectionConfidence: 0.5,
     minFacePresenceConfidence: 0.5,
     minTrackingConfidence: 0.5,
-    outputFacialTransformationMatrixes: false,
-    outputFaceBlendshapes: false,
+    // どちらも同じモデルが既に計算済みの値を「返してもらうだけ」で、
+    // 追加のダウンロードも追加料金も発生しない。
+    //   - 変換行列 : 顔の向き(yaw/pitch/roll)を推定式ではなく実測で得るため
+    //   - blendshape: 表情(笑顔・開口・閉眼)を自作の閾値ではなくモデルの出力で判定するため
+    outputFacialTransformationMatrixes: true,
+    outputFaceBlendshapes: true,
   });
 }
 
@@ -513,11 +517,19 @@ function preloadLandmarker(){
   loadLandmarker({ silent: true }).catch(() => {});
 }
 
+// ランドマークに加えて、同じ検出で既に計算されている
+// blendshape(表情52係数)と変換行列(顔の向き)も一緒に返す。
+// テスト用スタブのように landmarks しか返さない実装でも動くよう、
+// 追加情報は「あれば使う」扱いにしている。
 async function detectFace(image){
   const lm = await loadLandmarker();
   const result = lm.detect(image);
   if (!result.faceLandmarks || result.faceLandmarks.length === 0) return null;
-  return result.faceLandmarks[0]; // 468 landmarks
+  return {
+    landmarks: result.faceLandmarks[0],                       // 478点(虹彩10点を含む)
+    blendshapes: result.faceBlendshapes?.[0] || null,
+    matrix: result.facialTransformationMatrixes?.[0] || null,
+  };
 }
 
 // ===================================================================
@@ -545,7 +557,8 @@ els.btnAnalyze.addEventListener('click', async () => {
     setLoader(state.landmarker
       ? '顔写真を解析中… 468点のランドマークを検出しています'
       : 'AIの準備をしています…（初回のみ・少し時間がかかります）');
-    const lms = await detectFace(state.imgFace);
+    const detected = await detectFace(state.imgFace);
+    const lms = detected && detected.landmarks;
     if (!lms){
       hideLoader();
       // 行き止まりにしない: 原因のチェックリスト+その場で写真を選び直せる導線を出す
@@ -567,7 +580,7 @@ els.btnAnalyze.addEventListener('click', async () => {
 
     // 撮影品質のチェック(結果を出す前に)。入力の質が結果の質を決めるため、
     // 明らかに解析に向かない写真は、この段階で気づけるようにする。
-    const quality = checkPhotoQuality(lms, { image: state.imgFace });
+    const quality = checkPhotoQuality(lms, { image: state.imgFace, matrix: detected.matrix });
     if (quality.blocked){
       hideLoader();
       const items = quality.issues.filter(i => i.level === 'block')
@@ -584,7 +597,11 @@ els.btnAnalyze.addEventListener('click', async () => {
       setLoader('解析を続けています…');
     }
     state.photoQuality = quality;
-    state.result = analyzeFace(lms, { image: state.imgFace });
+    state.result = analyzeFace(lms, {
+      image: state.imgFace,
+      blendshapes: detected.blendshapes,   // 表情の判定に使う(無ければ従来の幾何判定)
+      matrix: detected.matrix,             // 顔の向きの実測に使う(無ければ従来の推定式)
+    });
     // 解析警告を表示 (照明・表情・ヨー)
     surfaceAnalysisWarnings(state.result.warnings || []);
 

@@ -35,7 +35,17 @@ export const FM = {
   GONION_L: 132, GONION_R: 361,
   // ほうれい線基点
   NASOLABIAL_L: 207, NASOLABIAL_R: 427,
+  // 虹彩(468〜477。モデルが返す478点のうち後ろの10点)
+  // 468=左虹彩の中心 / 469〜472=その輪郭、473=右虹彩の中心 / 474〜477=その輪郭
+  IRIS_L: 468, IRIS_R: 473,
 };
+
+// 角膜の横径(HVID)の代表値[mm]。
+// 個人差は概ね ±5% 程度に収まり、年齢・性別・体格による変動が非常に小さいため、
+// 「写真の中の1ピクセルが何mmか」を求める物差しとして使える。
+// ※ あくまで代表値なので、絶対値は「およそ」の表示に留める。
+//    一方、同じ人の Before/After 比較では同じ虹彩が基準になるため、差分は正確に出る。
+const HVID_MM = 11.7;
 
 // ===== 幾何ユーティリティ =====
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -125,7 +135,111 @@ function estimatePitch(lms){
   return { pitchDeg: raw - BASELINE_DEG, reliable: true };
 }
 
+// ===================================================================
+// 虹彩による絶対スケール(mm)の取得
+//
+// これまで全ての指標は「目の間の距離の何倍か」という相対値で、
+// 「0.047」のような単位のない数字しか出せなかった。
+// 虹彩の横径はほぼ誰でも約11.7mmなので、これを物差しにすると
+// 「約2mm」のように現実の大きさで伝えられる。
+//
+// 注意点:
+//  - 縦径はまぶたに隠れる影響でモデルの推定が小さめに出る(実測で横径比 -15%程度)
+//    ため、横径のみを使う
+//  - 顔が横を向くと横径は短く写るので、左右の大きい方を採用する
+// ===================================================================
+function irisScale(rawLms, image){
+  const none = { irisPx: null, mmPerPx: null, mmPerUnit: null, reliable: false };
+  if (!rawLms || rawLms.length < FM.IRIS_R + 5) return none;   // 虹彩なしのモデル/スタブ
+  const W = image ? (image.naturalWidth || image.width) : 0;
+  const H = image ? (image.naturalHeight || image.height) : 0;
+  if (!W || !H) return none;
+  // 正規化座標→ピクセル座標(ここは実ピクセルなのでアスペクト補正は不要)
+  const px = p => ({ x: p.x * W, y: p.y * H });
+  const hDiameter = base => {
+    const a = px(rawLms[base + 1]), b = px(rawLms[base + 3]);   // 輪郭の対向2点=横径
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+  const irisPx = Math.max(hDiameter(FM.IRIS_L), hDiameter(FM.IRIS_R));
+  if (!isFinite(irisPx) || irisPx < 4) return none;             // 小さすぎる=信頼できない
+  const mmPerPx = HVID_MM / irisPx;
+  return {
+    irisPx,
+    mmPerPx,
+    // 等方空間では「1単位 = 画像の横幅」なので、mm換算は画像幅(px)を掛ける
+    mmPerUnit: mmPerPx * W,
+    reliable: true,
+  };
+}
+
+// ===================================================================
+// 頭の向き(yaw/pitch/roll)をモデルの変換行列から取得
+//
+// これまでは「鼻先の横ズレ」「額と顎の奥行き差」から推定していたが、
+// どちらも顔の造作に左右される近似だった。モデルは同じ計算の中で
+// 既に正確な姿勢行列を持っているので、それを受け取るだけでよい(追加費用なし)。
+//
+// 行列は列優先の4x4。第2列が「顔の正面方向ベクトル」で、
+// そのY成分が上下の傾き(あおり/うつむき)にあたる。
+// モデル空間はY軸が上向き、画像座標はY軸が下向きなので、
+// pitch と roll は符号を反転して画像基準に合わせる(実測で確認済み)。
+// ===================================================================
+function poseFromMatrix(matrix){
+  const data = matrix && (matrix.data || matrix);
+  if (!data || data.length < 16) return null;
+  const at = (row, col) => data[col * 4 + row];
+  const clamp = v => Math.max(-1, Math.min(1, v));
+  const yawDeg   =  Math.atan2(at(0, 2), at(2, 2)) * 180 / Math.PI;
+  const pitchDeg =  Math.asin(clamp(at(1, 2))) * 180 / Math.PI;   // +であおり(あご上がり)
+  const rollDeg  = -Math.atan2(at(1, 0), at(1, 1)) * 180 / Math.PI;
+  if (![yawDeg, pitchDeg, rollDeg].every(isFinite)) return null;
+  return { yawDeg, pitchDeg, rollDeg, reliable: true, source: 'matrix' };
+}
+
+// ===================================================================
+// 表情の判定をモデルの blendshape から行う
+//
+// 自作の閾値判定には構造的な弱点があった。「口角の上がり具合」は
+// もともと口角が上向きの人／下向きの人で基準値が違うため、
+// 前者は常に笑顔扱いで口元の指標が毎回除外され、後者は笑っていても
+// 検出されない、という個人差による取りこぼしが起きる。
+// モデルは表情そのものを学習した52個の係数を返すので、それを使う。
+//
+// あわせて「目を閉じている(まばたき)」も取得する。従来は検出手段が無く、
+// 目をつむった写真でも、まぶたや目の開き具合を平然と計測していた。
+// ===================================================================
+function expressionFromBlendshapes(blendshapes){
+  const cats = blendshapes && (blendshapes.categories || blendshapes);
+  if (!Array.isArray(cats) || !cats.length) return null;
+  const v = {};
+  for (const c of cats){
+    const name = c.categoryName || c.displayName;
+    if (name) v[name] = c.score;
+  }
+  const pair = (a, b) => ((v[a] || 0) + (v[b] || 0)) / 2;
+  const smile   = pair('mouthSmileLeft', 'mouthSmileRight');
+  const frown   = pair('mouthFrownLeft', 'mouthFrownRight');
+  const jawOpen = v.jawOpen || 0;
+  const blink   = Math.max(v.eyeBlinkLeft || 0, v.eyeBlinkRight || 0);
+
+  let kind = 'neutral', confidence = 0;
+  if (smile > 0.25){
+    kind = 'smile';   confidence = Math.min(1, (smile - 0.25) / 0.35);
+  } else if (jawOpen > 0.30){
+    kind = 'openMouth'; confidence = Math.min(1, (jawOpen - 0.30) / 0.30);
+  } else if (frown > 0.25){
+    kind = 'frown';   confidence = Math.min(1, (frown - 0.25) / 0.35);
+  }
+  return {
+    kind, confidence,
+    smile, frown, jawOpen, blink,
+    eyesClosed: blink > 0.5,
+    source: 'blendshapes',
+  };
+}
+
 // === 表情判定 (Phase 3-13 表情正規化) ===
+// blendshape が使えない場合(テスト用スタブ等)のフォールバック。
 // 笑顔検出: 口角が口中央より十分上、口横幅/縦幅比が大、上下唇間がある
 function detectExpression(lms, scale){
   const mL = lms[FM.MOUTH_L], mR = lms[FM.MOUTH_R];
@@ -337,8 +451,34 @@ export function checkPhotoQuality(rawLms, opts={}){
         hint:'より鮮明な写真だと、細かい部分まで見られます。' });
     }
   }
+  // 4) 顔の向き(変換行列が取れている場合のみ)
+  // 横や上下を向いた写真は、輪郭・左右差・口元がまとめて実際と違って写る。
+  // 解析後の警告では「結果を見たあと」になってしまうので、ここで先に気づけるようにする。
+  const pose = poseFromMatrix(opts.matrix);
+  if (pose){
+    const yawAbs = Math.abs(pose.yawDeg), pitchAbs = Math.abs(pose.pitchDeg);
+    if (yawAbs > 28){
+      issues.push({ level:'block', kind:'yaw',
+        title:`顔が横を向いています（約${yawAbs.toFixed(0)}°）`,
+        hint:'カメラをまっすぐ見て、正面から撮ってください。' });
+    } else if (yawAbs > 15){
+      issues.push({ level:'warn', kind:'yaw',
+        title:'顔がやや斜めを向いています',
+        hint:'正面に近いほど、左右差や輪郭を正確に見られます。' });
+    }
+    if (pitchAbs > 22){
+      issues.push({ level:'block', kind:'pitch',
+        title: pose.pitchDeg > 0 ? `あごが上がっています（約${pitchAbs.toFixed(0)}°）` : `うつむいています（約${pitchAbs.toFixed(0)}°）`,
+        hint:'カメラを目の高さに構えて、まっすぐ撮ってください。' });
+    } else if (pitchAbs > 12){
+      issues.push({ level:'warn', kind:'pitch',
+        title: pose.pitchDeg > 0 ? 'あごがやや上がっています' : 'やや下を向いています',
+        hint:'カメラを目の高さに合わせると、輪郭や口元をより正確に見られます。' });
+    }
+  }
+
   const blocked = issues.some(i => i.level === 'block');
-  return { ok: !blocked, blocked, issues };
+  return { ok: !blocked, blocked, issues, pose };
 }
 
 // ===================================================================
@@ -372,12 +512,18 @@ export function analyzeFace(rawLms, opts={}){
     return (along(r) - along(l)) / s;   // +で右目(画像右)が下がっている
   })();
 
-  // === Phase 3-14: Yaw 推定 ===
-  const yaw = estimateYaw(lms);
-  // === あおり・うつむき(pitch)の推定 ===
-  const pitch = estimatePitch(lms);
-  // === Phase 3-13: 表情判定 ===
-  const expression = detectExpression(lms, scale);
+  // === 頭の向き ===
+  // モデルの変換行列があればそれを使う(実測値)。無ければ従来の推定式にフォールバック。
+  const pose = poseFromMatrix(opts.matrix);
+  const yaw = pose ? { yawDeg: pose.yawDeg, yawOffset: Math.sin(pose.yawDeg * Math.PI/180) }
+                   : estimateYaw(lms);
+  const pitch = pose ? { pitchDeg: pose.pitchDeg, reliable: true }
+                     : estimatePitch(lms);
+  // === 表情判定 ===
+  // blendshape があればモデルの出力を使う。無ければ従来の幾何ベース判定。
+  const expression = expressionFromBlendshapes(opts.blendshapes) || detectExpression(lms, scale);
+  // === 虹彩による絶対スケール(mm) ===
+  const iris = irisScale(rawLms, opts.image);
   // === Phase 3-13/3-15: ピクセル分析 (画像が渡された場合のみ) ===
   const pixels = opts.image ? analyzePixels(opts.image, rawLms, scale) : null;
 
@@ -403,6 +549,13 @@ export function analyzeFace(rawLms, opts={}){
   } else if (expression.kind === 'openMouth' && expression.confidence > 0.25){
     warnings.push({ kind:'expression', severity:'mid',
       message:'口が開いているため、口元まわりは今回の計測から外しました。口を軽く閉じた写真だと、この部分も見られます。' });
+  }
+  // 目を閉じている(まばたきの瞬間)と、まぶた・目の開き具合は本来の状態を表さない。
+  // これまでは検出手段が無く、つむった目をそのまま計測していた。
+  const eyesUnreliable = !!expression.eyesClosed;
+  if (eyesUnreliable){
+    warnings.push({ kind:'expression', severity:'mid',
+      message:'目を閉じた瞬間の写真のようです。まぶたと目元まわりは今回の計測から外しました。目を開けた写真だと、この部分も見られます。' });
   }
   if (pixels){
     if (pixels.luminanceOverall < 70) warnings.push({ kind:'lighting', severity:'high', message:'写真がやや暗めです。明るい場所で再撮影すると精度が上がります。' });
@@ -563,8 +716,10 @@ export function analyzeFace(rawLms, opts={}){
     scale,
     landmarksRaw: rawLms,
     landmarksNorm: lms,
-    rollDeg: norm.rollDeg,
+    rollDeg: pose ? pose.rollDeg : norm.rollDeg,
     yaw,
+    pose,
+    iris,
     expression,
     pixels,
     warnings,
@@ -581,12 +736,21 @@ export function analyzeFace(rawLms, opts={}){
       // Phase 3-15: テクスチャ(画像があれば)
       wrinkleIdx: pixels?.wrinkleIdx ?? null,
       toneEvenness: pixels?.toneEvenness ?? null,
-      // Phase 3-14: ヨー
+      // 頭の向き(変換行列があれば実測値、無ければ推定値)
       yawDeg: yaw.yawDeg,
       pitchDeg: pitch.reliable ? pitch.pitchDeg : null,
+      poseSource: pose ? 'matrix' : 'estimate',
+      // 虹彩による絶対スケール。1単位(=画像の横幅)が何mmにあたるか。
+      // これがあると、比率でしか出せなかった値を「約◯mm」で伝えられる。
+      mmPerUnit: iris.mmPerUnit,
+      // 指標の多くは「目の間の距離の何倍か」で表しているので、
+      // その1倍ぶんが何mmかを持っておくと、そのまま掛けて実寸に直せる。
+      mmPerScale: iris.mmPerUnit ? iris.mmPerUnit * scale : null,
       // 表情のせいで口元まわりが安静時を表していない場合のフラグ。
       // detectProblems はこれを見て、口角・ほうれい線の判定を行わない。
       mouthUnreliable,
+      // 目を閉じている場合のフラグ(まぶた・目元の判定を行わない)
+      eyesUnreliable,
     },
   };
 }
@@ -676,7 +840,8 @@ export function detectProblems(result, opts={}){
     });
   }
   // 5. むくみ
-  if (m.faceWHRatio > 0.78 || m.eyeOpenness < 0.085){
+  // ※目の開き具合はまばたきで大きく変わるため、目を閉じている写真では顔幅のみで見る
+  if (m.faceWHRatio > 0.78 || (!m.eyesUnreliable && m.eyeOpenness < 0.085)){
     out.push({
       key:'puffiness',
       severity: m.faceWHRatio > 0.85 ? 'high' : m.faceWHRatio > 0.81 ? 'mid' : 'low',
@@ -733,7 +898,7 @@ export function detectProblems(result, opts={}){
     });
   }
   // 10. NEW まぶた重い(フード)
-  if (m.browLidGap < 0.18){
+  if (!m.eyesUnreliable && m.browLidGap < 0.18){
     out.push({
       key:'hoodedEyelid',
       severity: m.browLidGap < 0.12 ? 'high' : m.browLidGap < 0.15 ? 'mid' : 'low',
@@ -744,6 +909,7 @@ export function detectProblems(result, opts={}){
     });
   }
   // 11. NEW 目尻下垂(垂れ目強め)
+  // ※目頭・目尻の位置はまばたきで動かないため、目を閉じていても判定できる
   if (m.eyeSlant > 0.025){
     out.push({
       key:'droopyEyeOuter',
@@ -897,17 +1063,22 @@ export function buildMetricsList(result){
     return { sev:'bad', pct: 25 };
   }
 
+  // 虹彩を物差しにして、比率で表していた値を実際の大きさ(mm)に直す。
+  // 個人差があるため「およそ」の値として添えるだけにする。
+  const mm = ratio => (m.mmPerScale ? `約${Math.abs(ratio * m.mmPerScale).toFixed(1)}mm` : null);
+  const withMm = (text, ratio) => { const s = mm(ratio); return s ? `${text}（${s}）` : text; };
+
   const items = [
     { name:'中心軸の傾き', value:`${m.midlineTilt.toFixed(1)}°`, detail:'鼻ブリッジ→顎の垂直からのズレ', ...sev(m.midlineTilt,[2.5,5]) },
     { name:'非対称スコア', value:m.asymmetryScore.toFixed(1), detail:'目・眉・口角の高さ差の総合', ...sev(m.asymmetryScore,[12,26]) },
-    { name:'口角の位置', value: m.mouthCornerDrop > 0 ? `下垂 ${(m.mouthCornerDrop*100).toFixed(1)}` : `上向き ${(Math.abs(m.mouthCornerDrop)*100).toFixed(1)}`, detail:'下唇中央に対する口角の位置', ...sev(Math.max(0,m.mouthCornerDrop),[0.015,0.035]) },
+    { name:'口角の位置', value: m.mouthCornerDrop > 0 ? `下垂 ${(m.mouthCornerDrop*100).toFixed(1)}` : `上向き ${(Math.abs(m.mouthCornerDrop)*100).toFixed(1)}`, detail: withMm('下唇中央に対する口角の位置', m.mouthCornerDrop), ...sev(Math.max(0,m.mouthCornerDrop),[0.015,0.035]) },
     { name:'ほうれい線指数', value:m.nasolabialIndex.toFixed(3), detail:'鼻翼→口角の距離(大きいほど良好)', ...sev(Math.max(0,0.46-m.nasolabialIndex),[0.02,0.06]) },
     { name:'フェイスラインの締まり', value:`${m.jawSharpness.toFixed(0)}°`, detail:'頬→顎の開き角(小さいほど締まり・大きいほどたるみ)。バーは頬下垂で評価', ...sev(Math.max(0, m.cheekDrop - 0.48),[0.07,0.14]) },
     { name:'顔の横/縦比', value:m.faceWHRatio.toFixed(2), detail:'理想 ≒ 0.67(小さいほど縦長・引き締まり)', ...sev(Math.max(0,m.faceWHRatio-0.7),[0.05,0.12]) },
     { name:'下顎プロミネンス', value:m.mandibleProminence.toFixed(2), detail:'頬骨幅に対する下顎角幅(大きい=エラ張り)', ...sev(Math.max(0,m.mandibleProminence-0.88),[0.05,0.10]) },
     { name:'頬コケ指数', value:m.cheekHollowIdx.toFixed(2), detail:'頬骨と頬輪郭の落差', ...sev(Math.max(0,m.cheekHollowIdx-0.15),[0.05,0.10]) },
     { name:'人中指数', value:m.philtrumIdx.toFixed(2), detail:'鼻下→上唇の長さ(大きい=長め)', ...sev(Math.max(0,m.philtrumIdx-0.28),[0.04,0.10]) },
-    { name:'眉-まぶた間', value:m.browLidGap.toFixed(2), detail:'眉と上まぶたの距離(小さい=まぶた重め)', ...sev(Math.max(0,0.20-m.browLidGap),[0.05,0.10]) },
+    { name:'眉-まぶた間', value:m.browLidGap.toFixed(2), detail: withMm('眉と上まぶたの距離(小さい=まぶた重め)', m.browLidGap), ...sev(Math.max(0,0.20-m.browLidGap),[0.05,0.10]) },
     { name:'目尻の傾き', value:m.eyeSlant.toFixed(3), detail:'+で目尻下がり / -でつり目', ...sev(Math.max(0,Math.abs(m.eyeSlant)-0.01),[0.015,0.03]) },
     { name:'五眼指数', value:m.fiveEyesIdx.toFixed(2), detail:'顔幅 ÷ 目幅(理想 5.0)', ...sev(Math.abs(m.fiveEyesIdx-5.0),[0.4,0.8]) },
     { name:'三庭バランス', value:m.triPct.map(p=>(p*100).toFixed(0)+'%').join(' / '), detail:'上庭/中庭/下庭(理想 33%/33%/33%)', ...sev(Math.max(Math.abs(m.triPct[0]-0.333),Math.abs(m.triPct[1]-0.333),Math.abs(m.triPct[2]-0.333)),[0.04,0.08]) },
@@ -920,9 +1091,25 @@ export function buildMetricsList(result){
     const pct = Math.round(m.toneEvenness * 100);
     items.push({ name:'肌トーン均一度', value:`${pct}%`, detail:'各部位の色差ばらつき(大きいほど均一)', sev: pct >= 75 ? 'good' : pct >= 55 ? 'mid' : 'bad', pct: pct });
   }
-  // Phase 3-14: ヨーが大きい場合の情報指標
+  // 顔の向き。指標そのものではなく「今回の写真がどれだけ正面だったか」を示す参考値。
+  // 変換行列から取れているときは、上下の傾き(あおり・うつむき)も併記する。
   if (typeof m.yawDeg === 'number'){
-    items.push({ name:'頭部ヨー', value:`${m.yawDeg.toFixed(1)}°`, detail:'顔の向き(0°が正面)', ...sev(Math.abs(m.yawDeg), [8, 18]) });
+    const exact = m.poseSource === 'matrix';
+    const yawAbs = Math.abs(m.yawDeg), pitchAbs = Math.abs(m.pitchDeg || 0);
+    // 数度のズレは「向いている」と言うほどではないので、正面として扱う
+    const updown = (exact && pitchAbs >= 3)
+      ? ` / 上下 ${m.pitchDeg > 0 ? 'あおり' : 'うつむき'} ${pitchAbs.toFixed(0)}°` : '';
+    const leftright = yawAbs >= 3 ? `左右 ${yawAbs.toFixed(0)}°` : '';
+    const value = (leftright || updown)
+      ? `${leftright}${updown}`.replace(/^ \/ /, '')
+      : 'ほぼ正面';
+    items.push({
+      name:'顔の向き',
+      value,
+      detail: exact ? '0°が正面。正面に近いほど、他の項目も正確に見られます'
+                    : '0°が正面(推定値)',
+      ...sev(Math.max(Math.abs(m.yawDeg), exact ? Math.abs(m.pitchDeg || 0) : 0), [8, 18]),
+    });
   }
 
   return items.map(it => ({ ...it, pct: Math.max(15, Math.min(100, it.pct)) }));
