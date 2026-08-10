@@ -1907,3 +1907,9 @@ body{
 }
 .flow-next:hover{ filter:brightness(1.05); }
 .flow-next.is-last{ background:linear-gradient(120deg, #E8A33B, #F0C04F); box-shadow:0 4px 14px rgba(232,163,59,.35); }
+
+/* 「働きかける場所」の注記（写真から筋肉状態を測っていないことの明示） */
+.tissue-note{
+  margin:10px 0 0; font-size:11.5px; color:var(--muted); line-height:1.7;
+}
+.problem-sev .sev-icon{ font-size:22px; line-height:1.1; }

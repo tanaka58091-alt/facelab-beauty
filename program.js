@@ -1,7 +1,7 @@
 // ===================================================================
 // 30-DAY FACE TRAINING PROGRAM (オーダーメイド設計)
 // Phase 1 (Day 1-10):  覚醒(Awakening)   - 動かしていない表情筋に火を入れる
-// Phase 2 (Day 11-20): 強化(Activation)  - 弱化筋を集中強化
+// Phase 2 (Day 11-20): 強化(Activation)  - 優先テーマを集中して取り組む
 // Phase 3 (Day 21-30): 定着(Integration) - 統合・習慣化・印象の定着
 // Day 7, 14, 21, 28 はアクティブレスト
 //
@@ -329,9 +329,9 @@ function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, life
   if (isRest){
     return `Day${day}は循環優先のアクティブレスト。${timeBudget}分以内・軽強度のみで構成し、明日からの集中強化に備えます。`;
   }
-  const phaseLabel = phase === 1 ? '覚醒期(使えていない筋に火を入れる段階)'
-                  : phase === 2 ? '強化期(弱化筋を集中で太くする段階)'
-                  : '定着期(統合と習慣化の段階)';
+  const phaseLabel = phase === 1 ? '慣らす時期(動かす感覚をつかむ段階)'
+                  : phase === 2 ? '強化する時期(集中して取り組む段階)'
+                  : '定着させる時期(習慣にする段階)';
 
   const goalLabel = {
     liftup:'リフトアップ', symmetry:'左右対称化', antiAging:'シワ対策',
@@ -341,10 +341,10 @@ function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, life
   const priorities = (priorityKeys||[]).slice(0,3).map(k => PROBLEM_LABEL[k] || k).filter(Boolean);
   const priorityText = priorities.length
     ? `特に「${priorities.join('・')}」へ最短ルートで効くトレーニング`
-    : '弱化筋を中心に効率重視で配列';
+    : '顔全体をバランスよく動かす構成';
 
   const lifeNote = lifestyleNote(lifestyle);
-  const ageNote = ageGroup ? `${ageGroup.replace('s','代')}の組織変化を考慮し、強度を最適化しています。` : '';
+  const ageNote = ageGroup ? `${ageGroup.replace('s','代')}に合わせて強度を調整しています。` : '';
   const contraNote = (contra && contra.length)
     ? `既往症「${contra.map(c => CONTRA_LABEL_SHORT[c]||c).join('・')}」に該当する種目は自動で除外しています。`
     : '';

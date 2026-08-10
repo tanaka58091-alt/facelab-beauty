@@ -267,21 +267,21 @@ function extractKeysFromText(text){
 
 // 症状から導かれた追加問題のメタ (16カテゴリ)
 const SYMPTOM_PROBLEM_META = {
-  facialAsymmetry: { title:'顔の左右非対称', desc:'お悩みから推定。表情筋の使い方の偏り・噛み癖などが背景にある可能性が高いです。', tissues:{tight:['側頭筋(片側)','咬筋(片側)','広頸筋'], weak:['口角挙筋(反対側)','大頬骨筋(反対側)']} },
-  mouthCornerDown: { title:'口角下がり', desc:'お悩みから推定。口角挙筋・大頬骨筋の弱化と、口角下制筋の過緊張が起こりやすい状態です。', tissues:{tight:['口角下制筋','下唇下制筋','広頸筋'], weak:['口角挙筋','大頬骨筋','小頬骨筋']} },
-  nasolabialFold:  { title:'ほうれい線・頬下垂', desc:'お悩みから推定。中顔面の筋肉の弱化と頬脂肪体の下垂が起こりやすい状態です。', tissues:{tight:['咬筋','口輪筋'], weak:['大頬骨筋','上唇挙筋','上唇鼻翼挙筋']} },
-  jawSagging:      { title:'フェイスラインのたるみ', desc:'お悩みから推定。広頸筋・咬筋の過緊張と、舌骨上筋群・首前面の弱化が要因です。', tissues:{tight:['広頸筋','咬筋','胸鎖乳突筋'], weak:['舌骨上筋群','顎二腹筋','頬筋']} },
-  puffiness:       { title:'顔のむくみ', desc:'お悩みから推定。リンパの停滞と表情筋の循環不足が背景となります。', tissues:{tight:['咬筋','広頸筋'], weak:['眼輪筋','頬筋','顎二腹筋']} },
-  partsBalance:    { title:'パーツバランスのズレ', desc:'お悩みから推定。骨格は変えられませんが、表情筋と姿勢で印象を整えられます。', tissues:{tight:['咬筋','側頭筋'], weak:['前頭筋','眼輪筋','大頬骨筋']} },
-  masseterHypertrophy: { title:'咬筋肥大・エラ張り', desc:'お悩みから推定。食いしばり・片噛みで咬筋が肥大し、輪郭の張りやこめかみ陥凹を引き起こします。', tissues:{tight:['咬筋','側頭筋','広頸筋'], weak:['舌','頬筋','口角挙筋']} },
-  cheekHollow:     { title:'頬コケ・中顔面の痩せ', desc:'お悩みから推定。頬筋・大頬骨筋の萎縮と脂肪減少で中顔面が陥凹して見える状態です。', tissues:{tight:['咬筋','口輪筋'], weak:['頬筋','大頬骨筋','上唇挙筋']} },
-  longPhiltrum:    { title:'人中の伸び・上唇下垂', desc:'お悩みから推定。上唇挙筋・口輪筋上部の弱化、口呼吸習慣で人中が長く見えます。', tissues:{tight:['口輪筋下部','下唇下制筋'], weak:['上唇挙筋','上唇鼻翼挙筋','口輪筋上部']} },
-  gummySmile:      { title:'ガミースマイル', desc:'お悩みから推定。上唇挙筋・小頬骨筋の過剰活動で上唇が引き上がりすぎる状態です。', tissues:{tight:['上唇挙筋','小頬骨筋'], weak:['口輪筋上部','上唇']} },
-  hoodedEyelid:    { title:'まぶたの重さ・厚み', desc:'お悩みから推定。眼瞼挙筋の弱化と前頭筋の代償が起こりやすい状態です。', tissues:{tight:['皺眉筋','眼輪筋外側'], weak:['眼瞼挙筋','前頭筋','眼輪筋上部']} },
-  droopyEyeOuter:  { title:'目尻下がり', desc:'お悩みから推定。眼輪筋外側と側頭筋膜のテンション低下が背景です。', tissues:{tight:['頬骨筋'], weak:['眼輪筋外側','側頭筋膜']} },
-  templeHollow:    { title:'こめかみ陥凹', desc:'お悩みから推定。側頭筋疲労と循環低下で組織が萎縮して見えます。', tissues:{tight:['側頭筋','咬筋'], weak:['前頭筋外側']} },
-  foreheadLines:   { title:'額の横ジワ', desc:'お悩みから推定。前頭筋の使い癖と眼瞼挙筋の代償が原因です。', tissues:{tight:['前頭筋'], weak:['眼瞼挙筋','眼輪筋上部']} },
-  glabellarLines:  { title:'眉間の縦ジワ', desc:'お悩みから推定。皺眉筋・鼻根筋の収縮癖が刻まれた状態です。', tissues:{tight:['皺眉筋','鼻根筋'], weak:['前頭筋中央']} },
+  facialAsymmetry: { title:'顔の左右非対称', desc:'お悩みとして挙げていただいたテーマです。左右を均等に動かす練習を中心にします。', tissues:{tight:['側頭筋(片側)','咬筋(片側)','広頸筋'], weak:['口角挙筋(反対側)','大頬骨筋(反対側)']} },
+  mouthCornerDown: { title:'口角下がり', desc:'お悩みとして挙げていただいたテーマです。口角を引き上げる動きを中心にケアします。', tissues:{tight:['口角下制筋','下唇下制筋','広頸筋'], weak:['口角挙筋','大頬骨筋','小頬骨筋']} },
+  nasolabialFold:  { title:'ほうれい線・頬下垂', desc:'お悩みとして挙げていただいたテーマです。ほおを引き上げる動きを中心にケアします。', tissues:{tight:['咬筋','口輪筋'], weak:['大頬骨筋','上唇挙筋','上唇鼻翼挙筋']} },
+  jawSagging:      { title:'フェイスラインのたるみ', desc:'お悩みとして挙げていただいたテーマです。首まわりをゆるめる動きと、あご下を動かす動きを組み合わせます。', tissues:{tight:['広頸筋','咬筋','胸鎖乳突筋'], weak:['舌骨上筋群','顎二腹筋','頬筋']} },
+  puffiness:       { title:'顔のむくみ', desc:'お悩みとして挙げていただいたテーマです。顔まわりを動かして流すケアを中心にします。', tissues:{tight:['咬筋','広頸筋'], weak:['眼輪筋','頬筋','顎二腹筋']} },
+  partsBalance:    { title:'パーツバランスのズレ', desc:'お悩みとして挙げていただいたテーマです。骨格はそのままに、表情と姿勢で印象を整えていきます。', tissues:{tight:['咬筋','側頭筋'], weak:['前頭筋','眼輪筋','大頬骨筋']} },
+  masseterHypertrophy: { title:'あごの角まわりの張り', desc:'お悩みとして挙げていただいたテーマです。あごまわりをゆるめるケアと、噛みしめに気づく習慣づくりを中心にします。', tissues:{tight:['咬筋','側頭筋','広頸筋'], weak:['舌','頬筋','口角挙筋']} },
+  cheekHollow:     { title:'頬コケ・中顔面の痩せ', desc:'お悩みとして挙げていただいたテーマです。内側から頬をふくらませる動きを中心にします。', tissues:{tight:['咬筋','口輪筋'], weak:['頬筋','大頬骨筋','上唇挙筋']} },
+  longPhiltrum:    { title:'人中の伸び・上唇下垂', desc:'お悩みとして挙げていただいたテーマです。上唇まわりを動かすケアを中心にします。', tissues:{tight:['口輪筋下部','下唇下制筋'], weak:['上唇挙筋','上唇鼻翼挙筋','口輪筋上部']} },
+  gummySmile:      { title:'ガミースマイル', desc:'お悩みとして挙げていただいたテーマです。上唇まわりの力の入れ方を整えるケアを中心にします。', tissues:{tight:['上唇挙筋','小頬骨筋'], weak:['口輪筋上部','上唇']} },
+  hoodedEyelid:    { title:'まぶたの重さ・厚み', desc:'お悩みとして挙げていただいたテーマです。まぶたまわりを目的の方向に動かす練習を中心にします。', tissues:{tight:['皺眉筋','眼輪筋外側'], weak:['眼瞼挙筋','前頭筋','眼輪筋上部']} },
+  droopyEyeOuter:  { title:'目尻下がり', desc:'お悩みとして挙げていただいたテーマです。目尻まわりを動かすケアを中心にします。', tissues:{tight:['頬骨筋'], weak:['眼輪筋外側','側頭筋膜']} },
+  templeHollow:    { title:'こめかみ陥凹', desc:'お悩みとして挙げていただいたテーマです。側頭部をゆるめるケアを中心にします。', tissues:{tight:['側頭筋','咬筋'], weak:['前頭筋外側']} },
+  foreheadLines:   { title:'額の横ジワ', desc:'お悩みとして挙げていただいたテーマです。額の力みをゆるめるケアを中心にします。', tissues:{tight:['前頭筋'], weak:['眼瞼挙筋','眼輪筋上部']} },
+  glabellarLines:  { title:'眉間の縦ジワ', desc:'お悩みとして挙げていただいたテーマです。眉間の力みをゆるめるケアを中心にします。', tissues:{tight:['皺眉筋','鼻根筋'], weak:['前頭筋中央']} },
 };
 
 function buildSymptomProblemKeys(){
@@ -597,11 +597,11 @@ els.btnAnalyze.addEventListener('click', async () => {
     // 履歴を保存 (サムネ+スコア+メタ)
     try {
       const score = calcScore(state.result, state.problems);
-      const { grade, percentile } = gradeFromScore(score, { ageGroup: state.ageGroup });
+      const { grade } = gradeFromScore(score, { ageGroup: state.ageGroup });
       const type = determineFaceType(state.problems, state.result.metrics);
       const thumb = thumbnailFromCanvas(els.canvasFace, 480);
       const meta = buildSnapshotMeta({
-        score, grade, percentile,
+        score, grade,
         faceType: type.name,
         ageGroup: state.ageGroup,
         goal: state.goal,
@@ -610,7 +610,7 @@ els.btnAnalyze.addEventListener('click', async () => {
       });
       saveSnapshot({ thumbDataUrl: thumb, meta });
       // 前回セッションを保存(写真なしで結果・プログラムを再表示できるように)
-      persistLastSession({ score, grade, percentile, faceTypeName: type.name, thumb });
+      persistLastSession({ score, grade, faceTypeName: type.name, thumb });
       renderProgress();
     } catch(e){ console.warn('[progress] save failed', e); }
     renderResumeBanner();
@@ -658,11 +658,11 @@ function renderAll(){
 }
 
 // ===== 前回セッションの保存・復元（写真なしで結果・プログラムを再表示） =====
-function persistLastSession({ score, grade, percentile, faceTypeName, thumb }){
+function persistLastSession({ score, grade, faceTypeName, thumb }){
   const r = state.result || {};
   saveLastSession({
     createdAt: new Date().toISOString(),
-    score, grade, percentile, faceTypeName,
+    score, grade, faceTypeName,
     problems: state.problems,
     result: { metrics: r.metrics, sideScores: r.sideScores, warnings: r.warnings, rollDeg: r.rollDeg, yaw: r.yaw, expression: r.expression },
     landmarksRaw: r.landmarksRaw,
@@ -1322,14 +1322,13 @@ function escapeHtml(s){
 
 function renderScoreAndType(){
   const score = calcScore(state.result, state.problems);
-  const { grade, desc, percentile } = gradeFromScore(score, { ageGroup: state.ageGroup });
+  const { grade, desc } = gradeFromScore(score, { ageGroup: state.ageGroup });
   els.scoreValue.textContent = score;
   els.scoreGrade.textContent = grade;
-  // ポジティブ枠: 伸びしろ文 + (上位半分のときだけ)同年代の目安 + あなたの強み(部位)
-  const pctNote = (percentile && percentile <= 50) ? ` 同年代で上位${percentile}%の目安。` : '';
+  // 他人との比較(上位◯%)は出さない。自分の状態 + 良いところを伝える。
   const strength = bestSideStrength();
   const strengthNote = strength ? ` あなたの強みは「${strength}」。` : '';
-  els.scoreDesc.textContent = desc + pctNote + strengthNote;
+  els.scoreDesc.textContent = desc + strengthNote;
   const circ = 2 * Math.PI * 52;
   els.scoreArc.setAttribute('stroke-dashoffset', circ - (score/100) * circ);
 
@@ -1501,30 +1500,32 @@ function glossMuscle(raw){
 
 function renderProblems(){
   els.problemsList.innerHTML = state.problems.map(p => {
-    const sevText = p.severity === 'high' ? '重' : p.severity === 'mid' ? '中' : '軽';
-    const sevPct  = p.severity === 'high' ? '85' : p.severity === 'mid' ? '55' : '30';
+    // 「85」のような測定していない数値は出さない(偽の精度を与えるため)。
+    // 医療的な「重症度」ではなく、取り組む順番の目安として表示する。
+    const sevIcon = p.severity === 'high' ? '◎' : p.severity === 'mid' ? '○' : '・';
+    const sevText = p.severity === 'high' ? '優先度 高' : p.severity === 'mid' ? '優先度 中' : '気になれば';
     return `
       <div class="problem sev-${p.severity}">
         <div class="problem-sev">
-          <strong>${sevPct}</strong><span>${sevText}度</span>
+          <strong class="sev-icon">${sevIcon}</strong><span>${sevText}</span>
         </div>
         <div class="problem-body">
           <h3>${p.title}</h3>
           <div class="problem-meta">
-            <span>計測値: <strong>${p.metric}</strong></span>
-            <span>重症度: <strong>${sevText}</strong></span>
+            <span>写真から: <strong>${p.metric}</strong></span>
           </div>
           <div class="problem-desc">${p.description}</div>
           <div class="tissue-list">
             <div class="tissue tight">
-              <strong>🔴 こわばっている所（ゆるめる）</strong>
+              <strong>🌷 このテーマで「ゆるめる」場所</strong>
               <ul>${p.tissues.tight.map(t=>`<li>${glossMuscle(t)}</li>`).join('') || '<li>—</li>'}</ul>
             </div>
             <div class="tissue weak">
-              <strong>🟡 使えていない所（鍛える）</strong>
+              <strong>💪 このテーマで「動かす」場所</strong>
               <ul>${p.tissues.weak.map(t=>`<li>${glossMuscle(t)}</li>`).join('') || '<li>—</li>'}</ul>
             </div>
           </div>
+          <p class="tissue-note">※ このテーマのケアが働きかける場所です。写真から筋肉の硬さや強さを測っているわけではありません。</p>
         </div>
         <div class="problem-side">${problemIllust(p.key)}</div>
       </div>

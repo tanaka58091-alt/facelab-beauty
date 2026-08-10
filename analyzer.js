@@ -42,8 +42,34 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const midpoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const angleDeg = (a, b) => Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
 
+// ===================================================================
+// 【重要】アスペクト比の補正 — 全ての幾何計算の前提
+//
+// MediaPipe の正規化座標は x = ピクセルX / 画像幅、y = ピクセルY / 画像高さ で、
+// x と y で単位が異なる(異方空間)。この空間のまま Math.hypot で距離を測ると、
+// 同じ顔でも画像のトリミング比率が変わるだけで全ての距離・比率・角度が変わる。
+//
+// そこで解析の最初に一度だけ y に (高さ/幅) を掛けて、
+// 「1単位 = 画像幅の1」の等方空間へ変換する。以降の距離・角度・roll補正は
+// すべてこの空間で行われるため、トリミングに依存しない再現性のある値になる。
+//
+// 画像サイズが不明な場合は 1.0(正方形扱い)にフォールバックする。
+// ===================================================================
+function toIsotropic(lms, aspect){
+  if (!aspect || !isFinite(aspect) || aspect === 1) return lms;
+  return lms.map(p => ({ x: p.x, y: p.y * aspect, z: p.z }));
+}
+function imageAspect(image){
+  if (!image) return 1;
+  const w = image.naturalWidth || image.width;
+  const h = image.naturalHeight || image.height;
+  if (!w || !h) return 1;
+  return h / w;   // 縦長なら > 1
+}
+
 // ===== 頭部姿勢の正規化 (roll補正) =====
 // 両目を結んだ線が水平になるように、すべてのランドマークを回転
+// ※ 等方空間で呼ぶこと(異方空間で回転すると顔が歪み、偽の左右差を生む)
 function normalizeLandmarks(lms){
   const lEye = midpoint(lms[FM.L_EYE_INNER], lms[FM.L_EYE_OUTER]);
   const rEye = midpoint(lms[FM.R_EYE_INNER], lms[FM.R_EYE_OUTER]);
@@ -242,9 +268,32 @@ function analyzePixels(image, lms, scale){
 // 顔分析: lms → metrics
 // ===================================================================
 export function analyzeFace(rawLms, opts={}){
-  const norm = normalizeLandmarks(rawLms);
+  // 1) まずアスペクト比を補正して等方空間へ(全計算の前提。これが無いと
+  //    同じ顔でもトリミング比率が変わるだけで指標が最大78%変動する)
+  const aspect = opts.aspect || imageAspect(opts.image);
+  const isoLms = toIsotropic(rawLms, aspect);
+  // 2) 等方空間で roll 補正(異方空間で回すと顔が歪み、偽の左右差を生む)
+  const norm = normalizeLandmarks(isoLms);
   const lms = norm.landmarks;
   const scale = faceScale(lms);
+
+  // 目の高さの左右差:
+  //   roll補正は「両目を結ぶ線」を水平化するため、補正後に両目の高さ差を測ると
+  //   構造的に必ず 0 になる(＝目の左右差は原理的に検出できない)。
+  //   かといって補正前に測ると、首の傾き(roll)と本当の左右差が混ざる。
+  //   そこで「顔自身の縦軸(額→顎)」に対する各目の位置を比べる。
+  //   顔ごと傾いても軸も一緒に傾くため、首の傾きに影響されず左右差だけを取り出せる。
+  const eyeHeightDiff = (() => {
+    const top = isoLms[FM.FOREHEAD], bottom = isoLms[FM.CHIN];
+    const axLen = dist(top, bottom);
+    if (!axLen) return 0;
+    const ax = { x: (bottom.x - top.x) / axLen, y: (bottom.y - top.y) / axLen }; // 顔の縦軸(下向き単位ベクトル)
+    const l = midpoint(isoLms[FM.L_EYE_INNER], isoLms[FM.L_EYE_OUTER]);
+    const r = midpoint(isoLms[FM.R_EYE_INNER], isoLms[FM.R_EYE_OUTER]);
+    const along = p => (p.x - top.x) * ax.x + (p.y - top.y) * ax.y;  // 縦軸に沿った位置
+    const s = dist(l, r) || 1;
+    return (along(r) - along(l)) / s;   // +で右目(画像右)が下がっている
+  })();
 
   // === Phase 3-14: Yaw 推定 ===
   const yaw = estimateYaw(lms);
@@ -279,7 +328,8 @@ export function analyzeFace(rawLms, opts={}){
 
   const lEyeCtr = midpoint(lms[FM.L_EYE_INNER], lms[FM.L_EYE_OUTER]);
   const rEyeCtr = midpoint(lms[FM.R_EYE_INNER], lms[FM.R_EYE_OUTER]);
-  const eyeHeightDiff = (rEyeCtr.y - lEyeCtr.y) / scale;
+  // eyeHeightDiff は上部で「顔の縦軸に対する各目の位置」から算出済み
+  // (ここで両目中点の y 差を取ると roll 補正の副作用で必ず 0 になるため)
 
   const lBrow = lms[FM.L_BROW_PEAK];
   const rBrow = lms[FM.R_BROW_PEAK];
@@ -491,7 +541,7 @@ export function detectProblems(result, opts={}){
       key:'facialAsymmetry',
       severity: asymSev,
       title:'顔の左右非対称',
-      description:'目・眉・口角の高さに左右差が見られます。表情筋の使い方の偏り・噛み癖・寝姿勢が原因となりやすい状態です。',
+      description:'写真では、目・眉・口角の高さに左右差が見られました。左右差は誰にでも自然にあるもので、撮影時の角度や表情でも見え方が変わります。写真だけで原因は判断できません。',
       tissues:{ tight:['側頭筋(片側)','咬筋(片側)','広頸筋','胸鎖乳突筋'], weak:['口角挙筋(反対側)','大頬骨筋(反対側)','眼輪筋(下垂側)'] },
       metric: `非対称スコア ${m.asymmetryScore.toFixed(1)} / 中心軸ズレ ${m.midlineTilt.toFixed(1)}°${note}`,
     });
@@ -502,7 +552,7 @@ export function detectProblems(result, opts={}){
       key:'mouthCornerDown',
       severity: m.mouthCornerDrop > ref.cornerDrop[1] ? 'high' : m.mouthCornerDrop > ((ref.cornerDrop[0]+ref.cornerDrop[1])/2) ? 'mid' : 'low',
       title:'口角下がり',
-      description:'口角が下唇中央より下にある状態です。口角挙筋・大頬骨筋の弱化と、口角下制筋の過緊張が起こりやすい状態です。',
+      description:'写真では、口角の位置が下唇の中央より下に見えました。口元の力の入り方や撮影時の表情でも見え方は変わります。',
       tissues:{ tight:['口角下制筋','下唇下制筋','広頸筋','オトガイ筋'], weak:['口角挙筋','大頬骨筋','小頬骨筋','頬筋'] },
       metric:`口角下垂指数 ${m.mouthCornerDrop.toFixed(3)}`,
     });
@@ -513,7 +563,7 @@ export function detectProblems(result, opts={}){
       key:'nasolabialFold',
       severity: m.nasolabialIndex < ref.nasolabial[1] ? 'high' : m.nasolabialIndex < ((ref.nasolabial[0]+ref.nasolabial[1])/2) ? 'mid' : 'low',
       title:'ほうれい線・頬下垂',
-      description:'鼻翼から口角の距離が短く、頬の脂肪体が下方に落ちている可能性。大頬骨筋・上唇挙筋の弱化が背景。',
+      description:'写真では、小鼻から口角までの距離が短めに見えました。ほうれい線の見え方は、光の向き・表情・撮影角度でも大きく変わります。',
       tissues:{ tight:['咬筋','口輪筋','下唇下制筋'], weak:['大頬骨筋','小頬骨筋','上唇挙筋','上唇鼻翼挙筋'] },
       metric:`鼻翼-口角距離指数 ${m.nasolabialIndex.toFixed(3)}`,
     });
@@ -527,7 +577,7 @@ export function detectProblems(result, opts={}){
       key:'jawSagging',
       severity: m.cheekDrop > ref.cheekDrop[1] ? 'high' : m.cheekDrop > midDrop ? 'mid' : 'low',
       title:'フェイスラインのたるみ',
-      description:'顎先から頬骨へのラインが鈍く、輪郭がぼやけている状態。広頸筋・咬筋の過緊張と、舌骨上筋群・首前面の弱化が要因。',
+      description:'写真では、フェイスラインの輪郭がやや不明瞭に見えました。あごの引き方・カメラの高さ・むくみやすい時間帯でも見え方は変化します。',
       tissues:{ tight:['広頸筋','咬筋','胸鎖乳突筋','側頭筋'], weak:['舌骨上筋群','顎二腹筋','頬筋','口角挙筋'] },
       metric:`頬下垂 ${m.cheekDrop.toFixed(2)} / 輪郭角 ${m.jawSharpness.toFixed(0)}°`,
     });
@@ -538,7 +588,7 @@ export function detectProblems(result, opts={}){
       key:'puffiness',
       severity: m.faceWHRatio > 0.85 ? 'high' : m.faceWHRatio > 0.81 ? 'mid' : 'low',
       title:'顔のむくみ',
-      description:'顔の横幅が広く、目元が腫れぼったい印象。リンパの停滞、表情筋の循環不足、塩分・水分代謝が背景となります。',
+      description:'写真では、顔の横幅がやや広めで、目元に張りが見られました。むくみの見え方は時間帯・前日の食事・睡眠・撮影距離でも変わります。',
       tissues:{ tight:['咬筋','広頸筋','胸鎖乳突筋'], weak:['眼輪筋','頬筋','顎二腹筋','舌筋'] },
       metric:`顔W/H ${m.faceWHRatio.toFixed(2)} / 開瞼度 ${m.eyeOpenness.toFixed(3)}`,
     });
@@ -551,7 +601,7 @@ export function detectProblems(result, opts={}){
       key:'partsBalance',
       severity: (triDev > 0.08 || fiveEyesDev > 1.0) ? 'mid' : 'low',
       title:'パーツバランスのズレ',
-      description:'三庭または五眼の理想バランスからズレがあります。骨格は変えられませんが筋肉と姿勢で印象は変えられます。',
+      description:'写真では、パーツの配置が一般的な目安の比率とは少し異なって見えました。これは個性であり、良し悪しではありません。表情や姿勢で印象は変えられます。',
       tissues:{ tight:['咬筋','側頭筋','後頭下筋群'], weak:['前頭筋','眼輪筋','大頬骨筋'] },
       metric:`三庭偏差 ${(triDev*100).toFixed(1)}% / 五眼指数 ${m.fiveEyesIdx.toFixed(2)}`,
     });
@@ -561,8 +611,8 @@ export function detectProblems(result, opts={}){
     out.push({
       key:'masseterHypertrophy',
       severity: m.mandibleProminence > 1.05 ? 'high' : m.mandibleProminence > 1.0 ? 'mid' : 'low',
-      title:'エラ張り(咬筋肥大)',
-      description:'下顎角が頬骨より外側に張り出しています。噛みしめ・食いしばりで咬筋が肥大している可能性。',
+      title:'あごの角まわりの張り',
+      description:'写真では、あごの角の部分が頬骨よりやや外側に見えました。骨格による個人差が大きい部分で、写真だけで原因は判断できません。',
       tissues:{ tight:['咬筋','側頭筋','内側翼突筋'], weak:['顎二腹筋','広頸筋','頬筋'] },
       metric:`下顎角プロミネンス ${m.mandibleProminence.toFixed(2)}`,
     });
@@ -573,7 +623,7 @@ export function detectProblems(result, opts={}){
       key:'cheekHollow',
       severity: m.cheekHollowIdx > 0.26 ? 'high' : m.cheekHollowIdx > 0.22 ? 'mid' : 'low',
       title:'頬コケ・中顔面痩せ',
-      description:'頬骨と頬輪郭の落差が大きく、頬がコケて見える状態。頬筋の萎縮や脂肪体の下垂が背景。',
+      description:'写真では、頬骨と頬の輪郭の落差がやや大きく見えました。光の当たり方で影ができると、実際より強調されて写ることがあります。',
       tissues:{ tight:['咬筋','側頭筋'], weak:['頬筋','大頬骨筋','上唇挙筋'] },
       metric:`頬コケ指数 ${m.cheekHollowIdx.toFixed(2)}`,
     });
@@ -584,7 +634,7 @@ export function detectProblems(result, opts={}){
       key:'longPhiltrum',
       severity: m.philtrumIdx > 0.42 ? 'mid' : 'low',
       title:'人中の長さ',
-      description:'鼻下〜上唇の距離が標準より長め。上唇挙筋の弱化で上唇全体が下がっていることもあります。',
+      description:'写真では、鼻の下から上唇までの距離が長めに見えました。骨格による個人差が大きく、カメラの高さでも見え方が変わります。',
       tissues:{ tight:['オトガイ筋','下唇下制筋'], weak:['上唇挙筋','大頬骨筋','口輪筋上部'] },
       metric:`人中指数 ${m.philtrumIdx.toFixed(2)}`,
     });
@@ -595,7 +645,7 @@ export function detectProblems(result, opts={}){
       key:'hoodedEyelid',
       severity: m.browLidGap < 0.12 ? 'high' : m.browLidGap < 0.15 ? 'mid' : 'low',
       title:'まぶたの重み・フード',
-      description:'眉と上まぶたの距離が近く、まぶたが目に覆いかぶさり気味。前頭筋・上眼瞼挙筋の動員不足が背景。',
+      description:'写真では、眉と上まぶたの距離が近めに見えました。まぶたの見え方は生まれつきの個性が大きく、撮影時の眠気や光でも変わります。',
       tissues:{ tight:['後頭下筋群','側頭筋'], weak:['前頭筋','上眼瞼挙筋','眼輪筋上部'] },
       metric:`眉-まぶた間 ${m.browLidGap.toFixed(2)}`,
     });
@@ -606,7 +656,7 @@ export function detectProblems(result, opts={}){
       key:'droopyEyeOuter',
       severity: m.eyeSlant > 0.045 ? 'mid' : 'low',
       title:'目尻の下垂',
-      description:'目尻が内側より下がっており、優しげな印象を超えて疲れた印象になりやすい状態。眼輪筋外側の動員不足。',
+      description:'写真では、目尻が目頭よりやや下がって見えました。目の形は生まれつきの個性で、そのままでも魅力になります。',
       tissues:{ tight:['側頭筋','咬筋'], weak:['眼輪筋外側部','前頭筋外側'] },
       metric:`目尻角度指数 ${m.eyeSlant.toFixed(3)}`,
     });
@@ -617,7 +667,7 @@ export function detectProblems(result, opts={}){
       key:'longLowerFace',
       severity: m.lowerFaceLength > 1.25 ? 'mid' : 'low',
       title:'下顔面の縦長感',
-      description:'鼻下〜顎先の距離が長く、顔の縦が強調されている状態。表情筋の動員で印象を引き締められます。',
+      description:'写真では、鼻の下からあご先までの距離が長めに見えました。骨格による個人差が大きい部分です。',
       tissues:{ tight:['オトガイ筋'], weak:['口輪筋','頬筋','広頸筋'] },
       metric:`下顔面比 ${m.lowerFaceLength.toFixed(2)}`,
     });
@@ -628,7 +678,7 @@ export function detectProblems(result, opts={}){
       key:'general',
       severity:'low',
       title:'美顔キープ',
-      description:'大きな問題は検出されませんでした。表情筋の柔軟性とリフトアップを維持しましょう。',
+      description:'写真からは、気になる大きな偏りは見られませんでした。今のバランスが保てています。',
       tissues:{ tight:[], weak:[] },
       metric:'良好',
     });
@@ -646,64 +696,64 @@ export function determineFaceType(problems, metrics){
 
   // 複合タイプ優先
   if (has('facialAsymmetry') && has('jawSagging')){
-    return { name:'左右差・たるみ複合タイプ', desc:'表情筋の使い方の偏りと輪郭の緩みが同居。左右対称化と引き上げを並行で行うのが効果的。', tags:['#左右差','#フェイスライン','#リフトアップ'] };
+    return { name:'左右差・たるみ複合タイプ', desc:'左右差と輪郭の両方が気になるタイプ。バランスを整える動きと引き上げの動きを並行して行います。', tags:['#左右差','#フェイスライン','#リフトアップ'] };
   }
   if (has('masseterHypertrophy') && has('facialAsymmetry')){
-    return { name:'エラ張り・噛みしめ偏りタイプ', desc:'噛み癖と咬筋肥大で輪郭が左右非対称に。咬筋の左右均等化が鍵。', tags:['#エラ張り','#噛みしめ','#左右差'] };
+    return { name:'あご角＋左右差タイプ', desc:'エラまわりと左右差の両方が気になるタイプ。左右を均等に使う練習と、あごまわりをゆるめるケアが中心です。', tags:['#エラ張り','#噛みしめ','#左右差'] };
   }
   if (has('mouthCornerDown') && has('nasolabialFold')){
-    return { name:'下顔面下垂タイプ', desc:'口角下がりとほうれい線が目立つ状態。大頬骨筋・口角挙筋の活性が鍵。', tags:['#口角UP','#ほうれい線','#中顔面'] };
+    return { name:'下顔面下垂タイプ', desc:'口元まわりが気になるタイプ。口角とほおを引き上げる動きを重ねていきます。', tags:['#口角UP','#ほうれい線','#中顔面'] };
   }
   if (has('cheekHollow') && has('nasolabialFold')){
-    return { name:'中顔面コケ・痩せ複合タイプ', desc:'頬コケとほうれい線で顔がやつれた印象に。内側から頬を起こすアプローチが有効。', tags:['#頬コケ','#中顔面','#ボリューム'] };
+    return { name:'中顔面コケ・痩せ複合タイプ', desc:'頬まわりの立体感が気になるタイプ。内側から頬をふくらませる動きが中心になります。', tags:['#頬コケ','#中顔面','#ボリューム'] };
   }
   if (has('puffiness') && metrics.faceWHRatio > 0.8){
-    return { name:'むくみ・丸顔タイプ', desc:'リンパの停滞と表情筋の循環低下が特徴。流して動かすアプローチが有効。', tags:['#むくみ','#リンパ','#小顔'] };
+    return { name:'むくみ・丸顔タイプ', desc:'顔まわりのめぐりが気になるタイプ。流すケアと動かす動きを組み合わせます。', tags:['#むくみ','#リンパ','#小顔'] };
   }
   if (has('jawSagging') && has('puffiness')){
-    return { name:'二重あご・スマホ顔タイプ', desc:'前方頭位と首前面の弱化で輪郭がぼやけがち。姿勢から立て直しを。', tags:['#二重あご','#姿勢','#スマホ顔'] };
+    return { name:'二重あご・スマホ顔タイプ', desc:'フェイスラインとむくみが重なるタイプ。首・姿勢を含めたケアから整えていきます。', tags:['#二重あご','#姿勢','#スマホ顔'] };
   }
   if (has('hoodedEyelid') && has('droopyEyeOuter')){
-    return { name:'まぶた重め・憂いタイプ', desc:'上まぶたと目尻が同時に下がり気味。眼輪筋と前頭筋の連携トレで開眼の窓が広がります。', tags:['#まぶた','#目尻','#開眼'] };
+    return { name:'まぶた重め・憂いタイプ', desc:'目元まわりが気になるタイプ。まぶたと目尻をやさしく動かすケアが中心です。', tags:['#まぶた','#目尻','#開眼'] };
   }
   // 単独主役タイプ
   if (has('masseterHypertrophy')){
-    return { name:'エラ張り・咬筋肥大タイプ', desc:'下顎角の張り出しが特徴。咬筋リリース＋噛みしめ習慣の改善で柔らかな印象に。', tags:['#エラ','#咬筋','#リリース'] };
+    return { name:'あご角しっかりタイプ', desc:'あごの角まわりが気になるタイプ。あごまわりをゆるめるケアと、噛みしめに気づく習慣づくりが中心です。', tags:['#エラ','#咬筋','#リリース'] };
   }
   if (has('cheekHollow')){
-    return { name:'中顔面コケ・繊細タイプ', desc:'頬がコケて見える状態。内側から頬を膨らませる動員で立体感が戻ります。', tags:['#頬コケ','#中顔面','#ボリューム'] };
+    return { name:'中顔面コケ・繊細タイプ', desc:'頬の立体感が気になるタイプ。内側から頬をふくらませる動きを中心にします。', tags:['#頬コケ','#中顔面','#ボリューム'] };
   }
   if (has('longPhiltrum')){
-    return { name:'人中長め・大人っぽタイプ', desc:'落ち着いた印象の人中。上唇の動員量で印象を自在に調整可能。', tags:['#人中','#上唇','#大人顔'] };
+    return { name:'人中長め・大人っぽタイプ', desc:'鼻の下から口元の距離が長めのタイプ。上唇まわりの動きで印象を変えていけます。', tags:['#人中','#上唇','#大人顔'] };
   }
   if (has('hoodedEyelid')){
-    return { name:'まぶた重め・憂いタイプ', desc:'まぶたが目を覆い気味。前頭筋と上眼瞼挙筋の独立トレで開眼力UP。', tags:['#まぶた','#開眼','#眠そう改善'] };
+    return { name:'まぶた重め・憂いタイプ', desc:'まぶたまわりが気になるタイプ。まぶたを目的の方向に動かす練習が中心です。', tags:['#まぶた','#開眼','#眠そう改善'] };
   }
   if (has('droopyEyeOuter')){
-    return { name:'目尻下がり・たれ目タイプ', desc:'優しい印象だが疲れて見えやすい。目尻の眼輪筋トレで生き生きとした目元に。', tags:['#垂れ目','#目尻','#印象UP'] };
+    return { name:'目尻下がり・たれ目タイプ', desc:'目尻が下がり気味のタイプ。やわらかな印象はそのままに、目元まわりを動かすケアを行います。', tags:['#垂れ目','#目尻','#印象UP'] };
   }
   if (has('longLowerFace')){
-    return { name:'縦長下顔面タイプ', desc:'下顔面が縦に長め。口輪筋・頬筋の動員で横方向のメリハリを足すと印象が引き締まる。', tags:['#縦長','#下顔面','#メリハリ'] };
+    return { name:'縦長下顔面タイプ', desc:'下顔面が縦に長めのタイプ。横方向のメリハリをつける動きで印象が変わります。', tags:['#縦長','#下顔面','#メリハリ'] };
   }
   if (has('partsBalance')){
-    return { name:'パーツバランス調整タイプ', desc:'骨格そのものは変えられませんが、表情筋・姿勢・血流で印象を整えることは十分可能です。', tags:['#黄金比','#三庭五眼','#印象UP'] };
+    return { name:'パーツバランス調整タイプ', desc:'パーツの配置に個性があるタイプ。骨格はそのままに、表情と姿勢で印象を整えていけます。', tags:['#黄金比','#三庭五眼','#印象UP'] };
   }
   if (has('facialAsymmetry')){
-    return { name:'左右非対称タイプ', desc:'噛み癖・頬杖・寝姿勢のクセが出ている可能性。両側均等な筋活動を取り戻します。', tags:['#左右差','#噛み癖','#バランス'] };
+    return { name:'左右非対称タイプ', desc:'左右差が気になるタイプ。左右を均等に動かす練習を中心にします。', tags:['#左右差','#噛み癖','#バランス'] };
   }
   if (has('jawSagging')){
-    return { name:'フェイスラインたるみタイプ', desc:'広頸筋・咬筋の緊張をリセットしつつ、首前面と舌骨上筋群を起こします。', tags:['#二重あご','#輪郭','#首前面'] };
+    return { name:'フェイスラインたるみタイプ', desc:'フェイスラインが気になるタイプ。首まわりをゆるめる動きと、あご下を動かす動きを組み合わせます。', tags:['#二重あご','#輪郭','#首前面'] };
   }
   if (has('mouthCornerDown')){
-    return { name:'口角下がり・印象クールタイプ', desc:'口角挙筋・大頬骨筋の活性で表情が明るく見えるように。', tags:['#口角UP','#印象','#スマイル'] };
+    return { name:'口角下がり・印象クールタイプ', desc:'口角が気になるタイプ。口角を引き上げる動きで、表情の印象が変わります。', tags:['#口角UP','#印象','#スマイル'] };
   }
   if (has('nasolabialFold')){
-    return { name:'中顔面ほうれい線タイプ', desc:'頬の脂肪体を本来位置へ。大頬骨筋＋上唇挙筋の動員で溝が浅くなります。', tags:['#ほうれい線','#中顔面','#リフト'] };
+    return { name:'中顔面ほうれい線タイプ', desc:'ほうれい線まわりが気になるタイプ。ほおを引き上げる動きが中心になります。', tags:['#ほうれい線','#中顔面','#リフト'] };
   }
   if (has('puffiness')){
-    return { name:'むくみ・朝顔タイプ', desc:'循環の停滞が特徴。表情筋を動かしてリンパポンプを起動。', tags:['#むくみ','#朝顔','#代謝'] };
+    return { name:'むくみ・朝顔タイプ', desc:'むくみが気になるタイプ。顔まわりを動かして流すケアが中心です。', tags:['#むくみ','#朝顔','#代謝'] };
   }
-  return { name:'美顔キープタイプ', desc:'良好な状態。維持トレーニングで未来の自分への投資を。', tags:['#維持','#予防','#美顔'] };
+  return { name:'美顔キープタイプ', desc:'大きな偏りが見られないタイプ。今の状態をキープするケアが中心です。', tags:['#維持','#予防','#美顔'] };
 }
 
 // ===================================================================
@@ -726,40 +776,20 @@ export function calcScore(result, problems, opts={}){
   return Math.max(45, Math.min(100, Math.round(score)));
 }
 
+// 状態ラベル。他人との比較(S/A/B/C/D の成績記号や「上位◯%」)は使わない。
+// この数値は「美しさの点数」ではなく、写真から測れた項目が目安の範囲にどれだけ
+// 収まっていたかを表す自分基準の指標(=次に取り組む量の目安)。
 export function gradeFromScore(score, opts={}){
-  const ageGroup = opts.ageGroup || '30s';
-  // 同年代でのおおよその percentile を推定(score → 上位%)
-  const percentile = scoreToPercentile(score, ageGroup);
   let grade, desc;
-  if (score >= 90)      { grade='S'; desc='とても整ったバランス。今の良さを保つ維持トレが中心です。'; }
-  else if (score >= 80) { grade='A'; desc='良好なバランス。気になる所をピンポイントで整えるとさらに映えます。'; }
-  else if (score >= 70) { grade='B'; desc='伸びしろが大きい状態。表情筋トレで変化を実感しやすい段階です。'; }
-  else if (score >= 60) { grade='C'; desc='のびしろたっぷり。30日で見た目の印象は十分に変えられます。'; }
-  else                  { grade='D'; desc='今がスタートの好機。まずは1日数分の習慣から、変化を積み上げましょう。'; }
-  return { grade, desc, percentile };
+  if (score >= 90)      { grade='ととのっている'; desc='写真から測れた範囲では、大きな偏りは見られませんでした。今の状態をキープするケアが中心です。'; }
+  else if (score >= 80) { grade='おおむね良好';   desc='全体的に整っています。気になるところをピンポイントで整えると、印象がさらに引き締まります。'; }
+  else if (score >= 70) { grade='のびしろあり';   desc='変化を実感しやすい段階です。まずは最優先テーマから取り組みましょう。'; }
+  else if (score >= 60) { grade='じっくり取り組む'; desc='取り組むテーマがいくつかあります。30日で見た目の印象は十分に変えられます。'; }
+  else                  { grade='ここからスタート'; desc='今がはじめどきです。1日数分の習慣から、変化を積み上げていきましょう。'; }
+  return { grade, desc };
 }
 
-function scoreToPercentile(score, ageGroup){
-  // 年代別の平均スコア推定(集団基準値)
-  const meanMap = { '10s':82, '20s':78, '30s':73, '40s':68, '50s':63, '60s':58 };
-  const mean = meanMap[ageGroup] || 73;
-  const sd = 10;
-  // 正規分布近似で上位%を推定
-  const z = (score - mean) / sd;
-  const phi = 0.5 * (1 + erf(z / Math.SQRT2));
-  const top = Math.max(1, Math.min(99, Math.round((1 - phi) * 100)));
-  return top; // 上位 top% に位置
-}
 
-function erf(x){
-  // Abramowitz & Stegun 7.1.26
-  const sign = x >= 0 ? 1 : -1;
-  x = Math.abs(x);
-  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
-  const t = 1 / (1 + p*x);
-  const y = 1 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*Math.exp(-x*x);
-  return sign * y;
-}
 
 // ===================================================================
 // 表示用 指標リスト
