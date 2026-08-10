@@ -102,21 +102,24 @@ function buildPool(problemKeys, count=4, contra=[]){
   return Array.from(pool);
 }
 
-// アンカー: 優先キーの上位2 + 全キーの上位1
+// アンカー(優先配置される種目)を2段階で作る。
+//   priority : ⭐で「特に気になる」と指定された悩みの主力種目 → 最も強く優先
+//   normal   : それ以外の悩みの主力種目 → ゆるやかに優先
+// 以前は両者を同じセットに入れていたため、⭐を付けても付けなくても
+// 選ばれ方が変わらなかった(実測でDay1が完全一致)。ここを分けるのが個別化の核。
 function buildAnchors(problemKeys, priorityKeys){
-  const anchors = new Set();
+  const priority = new Set();
   (priorityKeys||[]).forEach(k => {
     const map = PRESCRIPTION_MAP[k];
     if (!map) return;
-    if (map.training[0]) anchors.add(map.training[0]);
-    if (map.training[1]) anchors.add(map.training[1]);
-    if (map.training[2]) anchors.add(map.training[2]);
+    map.training.slice(0, 4).forEach(id => priority.add(id));
   });
+  const normal = new Set();
   problemKeys.forEach(k => {
     const map = PRESCRIPTION_MAP[k] || PRESCRIPTION_MAP.general;
-    if (map.training[0]) anchors.add(map.training[0]);
+    if (map.training[0] && !priority.has(map.training[0])) normal.add(map.training[0]);
   });
-  return anchors;
+  return { priority, normal };
 }
 
 // 軽量メニュー(アクティブレスト用)
@@ -135,6 +138,9 @@ function pickLeastUsed(idList, usage, count, opts){
   const { anchors, excludeIds=[], avoidIds=[], maxStretch=1, goal='overall', ageGroup='30s',
           goalFavorites, prescribed=new Set(), contra=[], timeOfDay='any', season=null,
           seasonFavorites=new Set(), lifeStageAvoid=new Set(), historyBoost={}, phase=1 } = opts;
+  // anchors は { priority, normal }。後方互換で Set が来た場合は normal 扱い。
+  const anchorsP = (anchors && anchors.priority) ? anchors.priority : new Set();
+  const anchorsN = (anchors && anchors.normal) ? anchors.normal : (anchors instanceof Set ? anchors : new Set());
   const zoneBias = GOAL_ZONE_BIAS[goal] || GOAL_ZONE_BIAS.overall;
   const seasonBias = season && SEASON_BIAS[season] ? SEASON_BIAS[season] : null;
 
@@ -145,8 +151,10 @@ function pickLeastUsed(idList, usage, count, opts){
     const meta = EXERCISE_META[id] || {};
     const fullMeta = getMeta(id);
     let s = usage[id] || 0;
-    // アンカー: 強い優先
-    if (anchors.has(id)) s -= 0.5;
+    // ⭐優先の悩みの主力種目は、他の要素に打ち消されない強さで優先する。
+    // (使用回数は1回ごとに+1なので、-2.2なら2回使っても他候補より前に来る)
+    if (anchorsP.has(id)) s -= 2.2;
+    else if (anchorsN.has(id)) s -= 0.5;
     // 悩みに直接効く処方種目を優先（オーダーメイドの核）
     if (prescribed.has(id)) s -= 0.45;
     // ゴール好みのリスト
@@ -159,7 +167,7 @@ function pickLeastUsed(idList, usage, count, opts){
     if (historyBoost[id]) s -= historyBoost[id];
     // ストレッチには僅かペナルティ（ただし、その悩みの主力＝アンカーは免除。
     // 例: エラ張りの主力「エラほぐし」等はゆるめる系でも優先配置する）
-    if (isStretch(id) && !anchors.has(id)) s += 0.25;
+    if (isStretch(id) && !anchorsP.has(id) && !anchorsN.has(id)) s += 0.25;
     // ゾーンバイアス
     s += zoneBias[meta.zone] || 0;
     // 季節フォーカスゾーンに僅か優先
@@ -192,8 +200,8 @@ function pickLeastUsed(idList, usage, count, opts){
   const sortFn = (a, b) => {
     const sa = score(a), sb = score(b);
     if (sa !== sb) return sa - sb;
-    const aa = anchors.has(a) ? 0 : 1;
-    const ab = anchors.has(b) ? 0 : 1;
+    const aa = anchorsP.has(a) ? 0 : anchorsN.has(a) ? 1 : 2;
+    const ab = anchorsP.has(b) ? 0 : anchorsN.has(b) ? 1 : 2;
     return aa - ab;
   };
 

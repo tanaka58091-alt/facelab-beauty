@@ -344,11 +344,16 @@ function collectHearing(){
   // 永続化
   saveUserPrefs();
   // 優先度: チップで .is-priority クラスが付いている上位3つ
+  // ⭐で指定されたチップ(最大3つ)に紐づく悩みキーを全て優先にする。
+  // 以前はキー数で slice(0,3) していたため、1チップが2キーを持つと
+  // 3つ目に選んだチップが丸ごと落ちていた(⭐が効かない一因)。
   state.priorityKeys = [];
   const seen = new Set();
-  document.querySelectorAll('#symptom-chips label.is-priority').forEach(lbl => {
+  const priorityChips = Array.from(
+    document.querySelectorAll('#symptom-chips label.is-priority')
+  ).filter(lbl => lbl.querySelector('input[type="checkbox"]')?.checked).slice(0, 3);
+  priorityChips.forEach(lbl => {
     const cb = lbl.querySelector('input[type="checkbox"]');
-    if (!cb || !cb.checked) return;
     const def = SYMPTOM_MAP[cb.value]; if (!def) return;
     def.keys.forEach(k => {
       if (seen.has(k)) return;
@@ -356,7 +361,6 @@ function collectHearing(){
       state.priorityKeys.push(k);
     });
   });
-  state.priorityKeys = state.priorityKeys.slice(0, 3);
 }
 function makeSymptomProblem(key){
   const meta = SYMPTOM_PROBLEM_META[key] || SYMPTOM_PROBLEM_META.facialAsymmetry;
@@ -1303,18 +1307,67 @@ function applyUserPrefsToForm(){
   });
 }
 
+// お悩み × 写真の「照合」。
+// 単に併記するのではなく、ご本人が気にしていることが写真でも見えたのか、
+// それとも写真では強く出ていないのかを、はっきり伝える。
+// (写真に出ない＝気のせい、ではない。だから扱いも変えないことを明記する)
 function renderSymptomSummary(){
   const has = state.symptoms.length > 0 || state.symptomFree;
   if (!has){ els.symptomSummary.hidden = true; return; }
-  const tags = state.symptoms.map(s => SYMPTOM_MAP[s]?.label).filter(Boolean)
-    .map(l => `<span>${l}</span>`).join('');
+
+  // 写真から検出された問題キー(お悩み由来で足したものは除く)
+  const fromPhoto = new Set(
+    (state.problems || []).filter(p => !p.fromSymptom && p.key !== 'general').map(p => p.key)
+  );
+  const prioritySet = new Set(state.priorityKeys || []);
+
+  // 選んだチップごとに、対応キーが写真でも見えたかを判定
+  const matched = [], notInPhoto = [];
+  state.symptoms.forEach(sym => {
+    const def = SYMPTOM_MAP[sym]; if (!def) return;
+    const hit = def.keys.some(k => fromPhoto.has(k));
+    const isPriority = def.keys.some(k => prioritySet.has(k));
+    (hit ? matched : notInPhoto).push({ label: def.label, isPriority });
+  });
+
+  const chip = (x, cls) => `<span class="ss-chip ${cls}">${x.isPriority ? '⭐ ' : ''}${escapeHtml(x.label)}</span>`;
+  const matchedBlock = matched.length ? `
+    <div class="ss-row">
+      <span class="ss-row-head ok">✅ 写真でも確認できました</span>
+      <span class="ss-tags">${matched.map(x => chip(x,'ok')).join('')}</span>
+      <span class="ss-row-note">気にされていた点が、写真の計測にも表れています。ここを最優先に組み立てました。</span>
+    </div>` : '';
+  const notBlock = notInPhoto.length ? `
+    <div class="ss-row">
+      <span class="ss-row-head soft">🔍 写真では強く出ていませんでした</span>
+      <span class="ss-tags">${notInPhoto.map(x => chip(x,'soft')).join('')}</span>
+      <span class="ss-row-note">写真は光・角度・時間帯で見え方が変わります。ご本人が気になるなら大切なテーマなので、メニューには入れています。</span>
+    </div>` : '';
+  const onlyPhoto = [...fromPhoto].filter(k => !state.symptoms.some(s => (SYMPTOM_MAP[s]?.keys||[]).includes(k)));
+  const onlyPhotoBlock = onlyPhoto.length ? `
+    <div class="ss-row">
+      <span class="ss-row-head info">💡 写真から気づいた点</span>
+      <span class="ss-tags">${onlyPhoto.map(k => `<span class="ss-chip info">${escapeHtml(PROBLEM_LABEL_JP[k] || k)}</span>`).join('')}</span>
+      <span class="ss-row-note">選ばれていませんでしたが、写真では見られた特徴です。気になる場合だけ取り入れてください。</span>
+    </div>` : '';
+
   els.symptomSummary.innerHTML = `
-    <strong>🌷 あなたのお悩み</strong>
-    <span class="ss-tags">${tags || '<span>未選択</span>'}</span>
+    <strong class="ss-title">🌷 あなたのお悩みと、写真の照合</strong>
+    ${matchedBlock}${notBlock}${onlyPhotoBlock}
     ${state.symptomFree ? `<span class="ss-free">📝 ${escapeHtml(state.symptomFree)}</span>` : ''}
   `;
   els.symptomSummary.hidden = false;
 }
+
+// 問題キー → 日本語ラベル(照合表示用)
+const PROBLEM_LABEL_JP = {
+  facialAsymmetry:'顔の左右差', mouthCornerDown:'口角の下がり', nasolabialFold:'ほうれい線まわり',
+  jawSagging:'フェイスライン', puffiness:'むくみ', partsBalance:'パーツのバランス',
+  masseterHypertrophy:'あごの角まわり', cheekHollow:'頬の立体感', longPhiltrum:'鼻の下の長さ',
+  gummySmile:'笑ったときの歯ぐき', hoodedEyelid:'まぶたの重さ', droopyEyeOuter:'目尻の下がり',
+  templeHollow:'こめかみ', foreheadLines:'額のシワ', glabellarLines:'眉間のシワ',
+  longLowerFace:'下顔面の長さ',
+};
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
