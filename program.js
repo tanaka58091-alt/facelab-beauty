@@ -36,7 +36,43 @@ const LIFESTAGE_AVOID = {
   postpartum: ['breathGlow','lionPose','neckIso'],
 };
 
-const COUNT_BY_TIME = { 3:3, 5:4, 10:5, 15:6 };
+// 生活習慣 → その人に効きやすい種目群。
+// 理由文で「〜を挟みます」と書く以上、実際にメニューへ反映させる。
+const LIFESTYLE_FAVORITE = {
+  posture_smartphone: ['postureFace','chinTuck','neckFront','neckBack','shoulderRoll','scalpRelease'],
+  posture_desk:       ['postureFace','shoulderRoll','neckSide','neckBack','focusShift','eyeRelease'],
+  diet_hardChew:      ['masseterRelease','masseterTap','masseterStretch','templeRelease','jawSlide','earYoga'],
+  stress_high:        ['glabellaRelease','foreheadSmooth','faceRelax','breathGlow','diaphragmBreath','scalpRelease'],
+  sleep_short:        ['faceLymphDrain','clavicleLymph','neckMassage','cheekPump','tongueOut','earYoga'],
+};
+function lifestyleFavorites(life){
+  const s = new Set();
+  if (!life) return s;
+  const add = k => (LIFESTYLE_FAVORITE[k] || []).forEach(id => s.add(id));
+  if (life.posture === 'smartphone') add('posture_smartphone');
+  if (life.posture === 'desk')       add('posture_desk');
+  if (life.diet === 'hardChew')      add('diet_hardChew');
+  if (life.stress === 'high')        add('stress_high');
+  if (life.sleep === 'short')        add('sleep_short');
+  return s;
+}
+
+// 1種目あたりの目安時間。exercises.js の duration('約1分'等)を分に直す。
+// 数値が読めないものは1分として扱う。
+function estMinutes(id){
+  const d = EXERCISES[id]?.duration || '';
+  const m = String(d).match(/(\d+(?:\.\d+)?)\s*分/);
+  if (m) return parseFloat(m[1]);
+  const sec = String(d).match(/(\d+)\s*秒/);
+  if (sec) return parseInt(sec[1],10) / 60;
+  return 1;
+}
+// 選んだ時間に見合う種目数。以前は {3:3,5:4,10:5,15:6} の固定表で、
+// 15分を選んでも実所要が3分ほどしかなく、選択の意味がなかった。
+// 1種目=約1分を基準に、ただし多すぎて負担にならない上限を設ける。
+const COUNT_BY_TIME = { 3:3, 5:5, 10:8, 15:11 };
+// 「まずはこれだけ」の最低実行ライン(先頭N種)。忙しい日はここまでで完了扱いにできる。
+const CORE_BY_TIME  = { 3:2, 5:3, 10:3, 15:4 };
 
 // goal → 好まれる zone (重みダウン = 選ばれやすい)
 const GOAL_ZONE_BIAS = {
@@ -87,12 +123,14 @@ function buildPrescribed(problemKeys){
 // 候補プール = 悩みへの処方セットが主役。
 // ただし「昨日と同じ種目」を避けるには1日分の2倍+αの候補が要るため、
 // 足りないぶんだけ全種目から補充する（オーダーメイド性と多様性の両立）。
-function buildPool(problemKeys, count=4, contra=[]){
+function buildPool(problemKeys, count=4, contra=[], lifeFavorites=new Set()){
   const ok = (id) => EXERCISES[id] && isExerciseAllowed(id, contra);
   const pool = new Set(Array.from(buildPrescribed(problemKeys)).filter(ok));
+  // 生活習慣に合う種目も候補に入れる(候補に無ければ優先しようがない)
+  lifeFavorites.forEach(id => { if (ok(id)) pool.add(id); });
   // 「昨日と同じ」を避けるには1日分の2倍+α、
   // 「30日飽きない」には最低24種は欲しい（不足分は全種目から補充）
-  const need = Math.max(count * 2 + 2, 24);
+  const need = Math.max(count * 3 + 4, 26);
   if (pool.size < need){
     for (const id of Object.keys(EXERCISES)){
       if (pool.size >= need) break;
@@ -138,7 +176,7 @@ function pickLeastUsed(idList, usage, count, opts){
   const { anchors, excludeIds=[], avoidIds=[], maxStretch=1, goal='overall', ageGroup='30s',
           goalFavorites, prescribed=new Set(), contra=[], timeOfDay='any', season=null,
           seasonFavorites=new Set(), lifeStageAvoid=new Set(), historyBoost={}, phase=1,
-          intensityPref='keep' } = opts;
+          intensityPref='keep', lifeFavorites=new Set() } = opts;
   // anchors は { priority, normal }。後方互換で Set が来た場合は normal 扱い。
   const anchorsP = (anchors && anchors.priority) ? anchors.priority : new Set();
   const anchorsN = (anchors && anchors.normal) ? anchors.normal : (anchors instanceof Set ? anchors : new Set());
@@ -162,6 +200,8 @@ function pickLeastUsed(idList, usage, count, opts){
     if (goalFavorites.has(id)) s -= 0.35;
     // 季節おすすめ
     if (seasonFavorites.has(id)) s -= 0.18;
+    // 生活習慣に合う種目(姿勢・噛み癖・ストレス・睡眠)
+    if (lifeFavorites.has(id)) s -= 0.4;
     // ライフステージ回避 (重いペナルティ、強制除外ではなく劣後)
     if (lifeStageAvoid.has(id)) s += 0.6;
     // 履歴ベース: 改善が遅い問題向けの種目に弱い優先
@@ -261,15 +301,16 @@ export function build30DayProgram(problemKeys, opts={}){
   // 途中評価の結果を反映: 続けるのが大変だった週は種目を減らし、
   // 余裕があった週は1種増やす。1〜7種の範囲に収める。
   const baseCount = COUNT_BY_TIME[timeBudget] || 4;
-  const count = Math.max(2, Math.min(7, baseCount + (adjustment?.countDelta || 0)));
+  const count = Math.max(2, Math.min(14, baseCount + (adjustment?.countDelta || 0)));
   // 禁忌種目を除外しつつ、重複回避に必要な数まで候補を確保
-  const pool = buildPool(problemKeys, count, contra);
+  const pool = buildPool(problemKeys, count, contra, lifestyleFavorites(lifestyle));
   const prescribed = buildPrescribed(problemKeys);
   const anchors = buildAnchors(problemKeys, priorityKeys);
   const goalFavorites = new Set(GOAL_FAVORITE[goal] || GOAL_FAVORITE.overall);
   const seasonFavorites = new Set(season ? (SEASON_FAVORITE[season] || []) : []);
   const lifeStageAvoid = new Set(LIFESTAGE_AVOID[lifeStage] || []);
   const historyBoost = buildHistoryBoost(history, problemKeys);
+  const lifeFavorites = lifestyleFavorites(lifestyle);
   const restPool = REST_FRIENDLY.filter(id => EXERCISES[id] && isExerciseAllowed(id, contra));
   const usage = Object.fromEntries(pool.map(id => [id, 0]));
 
@@ -288,15 +329,19 @@ export function build30DayProgram(problemKeys, opts={}){
     const sourceList = isRest && restPool.length >= count ? restPool : pool;
     const dayCount = isRest ? Math.max(3, count - 1) : count;
     const training = pickLeastUsed(sourceList, usage, dayCount, {
-      anchors, excludeIds: prevIds, avoidIds: prev1Ids, maxStretch: 2, phase,
+      anchors, excludeIds: prevIds, avoidIds: prev1Ids,
+      maxStretch: Math.max(2, Math.round(dayCount / 2.5)), phase,
       goal, ageGroup, goalFavorites, prescribed,
       contra, timeOfDay, season, seasonFavorites, lifeStageAvoid, historyBoost,
-      intensityPref: adjustment?.intensity || 'keep',
+      intensityPref: adjustment?.intensity || 'keep', lifeFavorites,
     });
     training.forEach(ex => { usage[ex.id] = (usage[ex.id] || 0) + 1; });
 
+    const estMin = training.reduce((sum, ex) => sum + estMinutes(ex.id), 0);
     days.push({
       day, phase, isRest,
+      coreCount: Math.min(training.length, (CORE_BY_TIME[timeBudget] || 3) + (isRest ? -1 : 0)),
+      estMinutes: Math.round(estMin * 10) / 10,
       theme: themeFor(phase, dayInPhase, isRest),
       training,
       reason: buildDayReason({ day, phase, isRest, training, priorityKeys, goal, lifestyle, ageGroup, timeBudget, contra, lifeStage, timeOfDay, season, history, historyBoostActive: Object.keys(historyBoost).length > 0 }),
@@ -383,7 +428,29 @@ function buildDayReason({ day, phase, isRest, training, priorityKeys, goal, life
     ? `過去スナップショット${history.length}件と比較し、改善が遅い指標向けの種目を弱く優先しています。`
     : '';
 
-  return `${phaseLabel}。今日の${training.length}種は、${priorityText}を中心に、過去2日と重複しないよう自動選定。ゴール「${goalLabel}」のゾーンを重点配置。${ageNote}${lifeNote}${contraNote}${lifeStageNote}${seasonNote}${todNote}${histNote}`;
+  // その日に実際に選ばれた種目に触れる。
+  // 以前は設定の羅列だけで、30日すべて同じ文章だった。
+  const names = training.map(e => e.name).filter(Boolean);
+  const lead = names.length
+    ? `今日は「${names[0]}」から始めて、${names.length}種を通します。`
+    : '';
+  // なぜその主役なのか(アンカー=悩みの主力かどうか)
+  const why = priorities.length
+    ? `${priorityText}をこの時期の軸にしています。`
+    : `${priorityText}です。`;
+  // ゆるめる/動かすの内訳を伝える(何をする日かが一目でわかる)
+  const stretchN = training.filter(e => e.kind === 'stretch').length;
+  const mix = stretchN
+    ? `内訳は、ゆるめる${stretchN}種と動かす${names.length - stretchN}種。`
+    : `今日はすべて「動かす」種目です。`;
+
+  // 毎日同じになる設定の説明は、初日と節目の日だけに絞る(毎日読ませない)
+  const showSetup = (day === 1 || day % 10 === 1);
+  const setupNote = showSetup
+    ? `${ageNote}${lifeNote}${contraNote}${lifeStageNote}${todNote}`
+    : '';
+
+  return `${phaseLabel}。${lead}${why}${mix}${seasonNote}${setupNote}${histNote}`;
 }
 
 const CONTRA_LABEL_SHORT = {

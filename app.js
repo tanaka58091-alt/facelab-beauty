@@ -1693,7 +1693,17 @@ function renderToday(){
   const today = state.program?.[dayNum - 1] || state.program?.[0];
   if (!today) return;
   renderJourneyBar(dayNum);
-  els.todayGrid.innerHTML = today.training.map(ex => exerciseCard(ex)).join('');
+  const core = today.coreCount || 0;
+  els.todayGrid.innerHTML = today.training.map((ex, i) => exerciseCard(ex, { core: i < core })).join('');
+  // 今日の分量を明示(選んだ時間と実際が食い違わないように)
+  const sumEl = document.getElementById('today-summary');
+  if (sumEl){
+    const mins = today.estMinutes || 0;
+    sumEl.hidden = false;
+    sumEl.innerHTML = `
+      <span class="ts-time">⏱ 今日は <strong>${today.training.length}種・約${mins}分</strong></span>
+      ${core ? `<span class="ts-core">忙しい日は、はじめの <strong>${core}種</strong> だけでもOK</span>` : ''}`;
+  }
   bindExerciseCards(els.todayGrid);
   if (els.todayReason && today.reason){
     els.todayReason.innerHTML = `<span class="reason-title">🎯 なぜ今日この${today.training.length}種なのか（Day ${dayNum}）</span>${escapeHtml(today.reason)}`;
@@ -1854,12 +1864,13 @@ function renderProgramMeta(){
     <span><strong>優先:</strong>${priText}</span>
   `;
 }
-function exerciseCard(ex){
+function exerciseCard(ex, opts={}){
+  const coreBadge = opts.core ? '<span class="ex-core">まずはこれだけ</span>' : '';
   return `
-    <div class="exercise-card" data-ex="${ex.id}">
+    <div class="exercise-card${opts.core ? ' is-core' : ''}" data-ex="${ex.id}">
       <div class="ex-illust">${ex.illustration}</div>
       <div class="ex-info">
-        <span class="ex-cat training">トレーニング</span>
+        <span class="ex-cat training">トレーニング</span>${coreBadge}
         <h4>${ex.name}</h4>
         <div class="ex-meta">
           <span><strong>⏱</strong> ${ex.duration}</span>
