@@ -108,6 +108,23 @@ function estimateYaw(lms){
   return { yawDeg, yawOffset: offset };
 }
 
+// === 頭部 Pitch(あおり・うつむき)の推定 ===
+// スマホを顔より下や上で構えると起こる、自撮りで最も多い角度ずれ。
+// 顔の中心線(額→顎)が奥行き方向にどれだけ倒れているかで見る。
+// 注: MediaPipe の z はカメラ距離に依存する相対値のため、角度の絶対値は
+//     厳密ではない。そのため「大きく傾いているか」の判定にのみ使い、
+//     ユーザーには角度の数値ではなく、傾いている旨だけを伝える。
+function estimatePitch(lms){
+  const top = lms[FM.FOREHEAD], bottom = lms[FM.CHIN];
+  const dy = bottom.y - top.y;
+  if (!dy) return { pitchDeg: 0, reliable: false };
+  const dz = (bottom.z ?? 0) - (top.z ?? 0);
+  // 正面・直立の顔でも顔の丸みで数度のオフセットが出るため、それを差し引く
+  const BASELINE_DEG = 2.5;
+  const raw = Math.atan2(dz, dy) * 180 / Math.PI;
+  return { pitchDeg: raw - BASELINE_DEG, reliable: true };
+}
+
 // === 表情判定 (Phase 3-13 表情正規化) ===
 // 笑顔検出: 口角が口中央より十分上、口横幅/縦幅比が大、上下唇間がある
 function detectExpression(lms, scale){
@@ -125,15 +142,19 @@ function detectExpression(lms, scale){
 
   let kind = 'neutral';
   let confidence = 0;
-  if (cornerLift > 0.012 && widthHeightRatio > 5){
+  // widthHeightRatio は閉口時でも 9〜48 になるため条件として機能しない(常に真)。
+  // 口角の引き上げ量だけで判定する。
+  if (cornerLift > 0.018){
     kind = 'smile';
-    confidence = Math.min(1, (cornerLift - 0.012) * 30);
-  } else if (lipGap > 0.06){
+    confidence = Math.min(1, (cornerLift - 0.018) * 25);
+  } else if (lipGap > 0.11){
+    // 唇の厚みぶんの隙間(実測 0.06〜0.09)では発火しない値にする。
+    // ここを超えるのは、はっきり口が開いている場合。
     kind = 'openMouth';
-    confidence = Math.min(1, (lipGap - 0.06) * 8);
-  } else if (cornerLift < -0.005){
+    confidence = Math.min(1, (lipGap - 0.11) * 8);
+  } else if (cornerLift < -0.02){
     kind = 'frown';
-    confidence = Math.min(1, (-0.005 - cornerLift) * 30);
+    confidence = Math.min(1, (-0.02 - cornerLift) * 25);
   }
   return { kind, confidence, cornerLift, widthHeightRatio, lipGap };
 }
@@ -265,6 +286,62 @@ function analyzePixels(image, lms, scale){
 }
 
 // ===================================================================
+// 撮影品質のチェック（解析の前に走らせる）
+//
+// 入力の質が結果の質を決めるため、明らかに解析に向かない写真は
+// 結果を出す前に気づけるようにする。判定は「ブロックする(block)」と
+// 「注意して進む(warn)」の2段階。
+// ここでは顔の内部状態は一切判定せず、写真の写り方だけを見る。
+// ===================================================================
+export function checkPhotoQuality(rawLms, opts={}){
+  const issues = [];
+  const image = opts.image;
+  const W = image ? (image.naturalWidth || image.width) : 0;
+  const H = image ? (image.naturalHeight || image.height) : 0;
+
+  // 顔の写っている範囲(正規化座標)
+  let minX=1, maxX=0, minY=1, maxY=0;
+  for (const p of rawLms){
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  const faceW = maxX - minX, faceH = maxY - minY;
+
+  // 1) 顔が画面からはみ出している
+  const margin = 0.005;
+  if (minX < -margin || maxX > 1+margin || minY < -margin || maxY > 1+margin){
+    issues.push({ level:'block', kind:'crop',
+      title:'顔が画面からはみ出しています',
+      hint:'顔全体（額から下あごまで）が写るように、少し引いて撮ってください。' });
+  }
+  // 2) 顔が小さすぎる(細部が測れない)
+  if (faceW < 0.22 || faceH < 0.22){
+    issues.push({ level:'block', kind:'small',
+      title:'顔が小さく写っています',
+      hint:'顔が画面の半分くらいを占めるように、もう少し近づいて撮ってください。' });
+  } else if (faceW < 0.32 && faceH < 0.32){
+    issues.push({ level:'warn', kind:'small',
+      title:'顔がやや小さめです',
+      hint:'もう少し近づくと、細かい部分まで見られます。' });
+  }
+  // 3) 画像の解像度が低い / 顔のピクセル数が少ない
+  if (W && H){
+    const facePx = Math.min(faceW * W, faceH * H);
+    if (facePx < 180){
+      issues.push({ level:'block', kind:'lowres',
+        title:'画像が粗いようです',
+        hint:'カメラで撮り直すか、圧縮されていない写真をお選びください。' });
+    } else if (facePx < 300){
+      issues.push({ level:'warn', kind:'lowres',
+        title:'画像がやや粗めです',
+        hint:'より鮮明な写真だと、細かい部分まで見られます。' });
+    }
+  }
+  const blocked = issues.some(i => i.level === 'block');
+  return { ok: !blocked, blocked, issues };
+}
+
+// ===================================================================
 // 顔分析: lms → metrics
 // ===================================================================
 export function analyzeFace(rawLms, opts={}){
@@ -297,6 +374,8 @@ export function analyzeFace(rawLms, opts={}){
 
   // === Phase 3-14: Yaw 推定 ===
   const yaw = estimateYaw(lms);
+  // === あおり・うつむき(pitch)の推定 ===
+  const pitch = estimatePitch(lms);
   // === Phase 3-13: 表情判定 ===
   const expression = detectExpression(lms, scale);
   // === Phase 3-13/3-15: ピクセル分析 (画像が渡された場合のみ) ===
@@ -308,12 +387,22 @@ export function analyzeFace(rawLms, opts={}){
     warnings.push({ kind:'yaw', severity: Math.abs(yaw.yawDeg) > 22 ? 'high':'mid',
       message:`顔が${Math.abs(yaw.yawDeg).toFixed(0)}°斜めを向いています。可能な限り正面を向いた写真で再撮影すると精度が上がります。` });
   }
-  if (expression.kind === 'smile' && expression.confidence > 0.4){
+  if (pitch.reliable && Math.abs(pitch.pitchDeg) > 12){
+    warnings.push({ kind:'pitch', severity: Math.abs(pitch.pitchDeg) > 20 ? 'high' : 'mid',
+      message: pitch.pitchDeg > 0
+        ? 'あごが上がった角度（あおり）で写っているようです。カメラを目の高さに合わせると、輪郭や口元がより正確に見られます。'
+        : 'うつむいた角度で写っているようです。カメラを目の高さに合わせると、輪郭や口元がより正確に見られます。' });
+  }
+  // 表情が入っていると、口元まわりの指標は「安静時の状態」を表さない。
+  // 警告を出すだけでなく、該当指標を計測対象から外す(下の mouthUnreliable)。
+  const mouthUnreliable = (expression.kind === 'smile' && expression.confidence > 0.25)
+                       || (expression.kind === 'openMouth' && expression.confidence > 0.25);
+  if (expression.kind === 'smile' && expression.confidence > 0.25){
     warnings.push({ kind:'expression', severity:'mid',
-      message:'笑顔の表情が検出されました。安静時の特徴(口角下がり・ほうれい線等)は無表情の写真で正確に判定できます。' });
-  } else if (expression.kind === 'openMouth' && expression.confidence > 0.4){
+      message:'笑顔で写っているため、口角とほうれい線まわりは今回の計測から外しました。無表情の写真だと、この2つも見られます。' });
+  } else if (expression.kind === 'openMouth' && expression.confidence > 0.25){
     warnings.push({ kind:'expression', severity:'mid',
-      message:'口が開いた表情が検出されました。口を軽く閉じた状態で再撮影してください。' });
+      message:'口が開いているため、口元まわりは今回の計測から外しました。口を軽く閉じた写真だと、この部分も見られます。' });
   }
   if (pixels){
     if (pixels.luminanceOverall < 70) warnings.push({ kind:'lighting', severity:'high', message:'写真がやや暗めです。明るい場所で再撮影すると精度が上がります。' });
@@ -494,6 +583,10 @@ export function analyzeFace(rawLms, opts={}){
       toneEvenness: pixels?.toneEvenness ?? null,
       // Phase 3-14: ヨー
       yawDeg: yaw.yawDeg,
+      pitchDeg: pitch.reliable ? pitch.pitchDeg : null,
+      // 表情のせいで口元まわりが安静時を表していない場合のフラグ。
+      // detectProblems はこれを見て、口角・ほうれい線の判定を行わない。
+      mouthUnreliable,
     },
   };
 }
@@ -546,8 +639,8 @@ export function detectProblems(result, opts={}){
       metric: `非対称スコア ${m.asymmetryScore.toFixed(1)} / 中心軸ズレ ${m.midlineTilt.toFixed(1)}°${note}`,
     });
   }
-  // 2. 口角下がり
-  if (m.mouthCornerDrop > ref.cornerDrop[0]){
+  // 2. 口角下がり (笑顔・開口時は安静時の状態を表さないため判定しない)
+  if (!m.mouthUnreliable && m.mouthCornerDrop > ref.cornerDrop[0]){
     out.push({
       key:'mouthCornerDown',
       severity: m.mouthCornerDrop > ref.cornerDrop[1] ? 'high' : m.mouthCornerDrop > ((ref.cornerDrop[0]+ref.cornerDrop[1])/2) ? 'mid' : 'low',
@@ -557,8 +650,8 @@ export function detectProblems(result, opts={}){
       metric:`口角下垂指数 ${m.mouthCornerDrop.toFixed(3)}`,
     });
   }
-  // 3. ほうれい線
-  if (m.nasolabialIndex < ref.nasolabial[0]){
+  // 3. ほうれい線 (笑顔・開口時は口元が動くため判定しない)
+  if (!m.mouthUnreliable && m.nasolabialIndex < ref.nasolabial[0]){
     out.push({
       key:'nasolabialFold',
       severity: m.nasolabialIndex < ref.nasolabial[1] ? 'high' : m.nasolabialIndex < ((ref.nasolabial[0]+ref.nasolabial[1])/2) ? 'mid' : 'low',

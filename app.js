@@ -2,7 +2,7 @@
 // MAIN APP CONTROLLER - FaceLab Beauty
 // ===================================================================
 import {
-  analyzeFace, detectProblems, determineFaceType,
+  analyzeFace, detectProblems, determineFaceType, checkPhotoQuality,
   calcScore, gradeFromScore, buildMetricsList, FM,
 } from './analyzer.js';
 import { EXERCISES, getMeta, CONTRA_LABEL, TIME_OF_DAY_LABEL, TOOLS_LABEL, PRESCRIPTION_MAP, isExerciseAllowed } from './exercises.js';
@@ -563,6 +563,26 @@ els.btnAnalyze.addEventListener('click', async () => {
       if (reselect && els.fileFace) els.fileFace.click();  // その場でファイル選択を再オープン
       return;
     }
+
+    // 撮影品質のチェック(結果を出す前に)。入力の質が結果の質を決めるため、
+    // 明らかに解析に向かない写真は、この段階で気づけるようにする。
+    const quality = checkPhotoQuality(lms, { image: state.imgFace });
+    if (quality.blocked){
+      hideLoader();
+      const items = quality.issues.filter(i => i.level === 'block')
+        .map(i => `<li><strong>${escapeHtml(i.title)}</strong><br><span style="color:var(--muted)">${escapeHtml(i.hint)}</span></li>`).join('');
+      const reselect = await uiConfirm({
+        title: 'もう一度撮ると、もっと正確に見られます',
+        message: `写真の写り方について、気づいた点があります：
+          <ul style="margin:10px 0 0; padding-left:20px; line-height:1.9;">${items}</ul>
+          <p style="margin-top:12px; font-size:12.5px; color:var(--muted)">このまま進めることもできますが、写り方によって結果が変わることがあります。</p>`,
+        okText: '写真を選び直す',
+        cancelText: 'このまま進む',
+      });
+      if (reselect && els.fileFace){ els.fileFace.click(); return; }
+      setLoader('解析を続けています…');
+    }
+    state.photoQuality = quality;
     state.result = analyzeFace(lms, { image: state.imgFace });
     // 解析警告を表示 (照明・表情・ヨー)
     surfaceAnalysisWarnings(state.result.warnings || []);
@@ -744,11 +764,15 @@ function renderResumeBanner(){
 function surfaceAnalysisWarnings(warnings){
   const host = document.getElementById('analysis-warnings');
   if (!host) return;
-  if (!warnings || warnings.length === 0){ host.hidden = true; host.innerHTML = ''; return; }
+  // 撮影品質の「注意して進む」項目も同じ枠にまとめて出す
+  const qIssues = (state.photoQuality?.issues || []).filter(i => i.level === 'warn')
+    .map(i => ({ kind:'photo', severity:'mid', message: `${i.title}。${i.hint}` }));
+  warnings = [...qIssues, ...(warnings || [])];
+  if (warnings.length === 0){ host.hidden = true; host.innerHTML = ''; return; }
   host.hidden = false;
   host.innerHTML = warnings.map(w => `
     <div class="analysis-warning ${w.severity || 'mid'}">
-      <span class="aw-ico">${w.kind==='lighting'?'💡':w.kind==='yaw'?'↪':w.kind==='expression'?'😊':'⚠'}</span>
+      <span class="aw-ico">${w.kind==='lighting'?'💡':w.kind==='yaw'?'↪':w.kind==='pitch'?'📐':w.kind==='expression'?'😊':w.kind==='photo'?'📷':'⚠'}</span>
       <span class="aw-msg">${w.message}</span>
     </div>
   `).join('');
