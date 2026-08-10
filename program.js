@@ -137,7 +137,8 @@ const isStretch = (id) => EXERCISES[id]?.kind === 'stretch';
 function pickLeastUsed(idList, usage, count, opts){
   const { anchors, excludeIds=[], avoidIds=[], maxStretch=1, goal='overall', ageGroup='30s',
           goalFavorites, prescribed=new Set(), contra=[], timeOfDay='any', season=null,
-          seasonFavorites=new Set(), lifeStageAvoid=new Set(), historyBoost={}, phase=1 } = opts;
+          seasonFavorites=new Set(), lifeStageAvoid=new Set(), historyBoost={}, phase=1,
+          intensityPref='keep' } = opts;
   // anchors は { priority, normal }。後方互換で Set が来た場合は normal 扱い。
   const anchorsP = (anchors && anchors.priority) ? anchors.priority : new Set();
   const anchorsN = (anchors && anchors.normal) ? anchors.normal : (anchors instanceof Set ? anchors : new Set());
@@ -180,6 +181,13 @@ function pickLeastUsed(idList, usage, count, opts){
     }
     // 年代別強度ペナルティ
     s += intensityPenalty(meta.intensity, ageGroup);
+    // 途中評価による強度の調整(きつい/違和感 → 軽いものを優先、余裕あり → 強めも許容)
+    if (intensityPref === 'light'){
+      if (meta.intensity === 'light') s -= 0.5;
+      if (meta.intensity === 'heavy') s += 0.8;
+    } else if (intensityPref === 'up'){
+      if (meta.intensity === 'heavy') s -= 0.3;
+    }
     // フェーズごとに主役の tier を入れ替える
     //   Phase1=基礎を覚える / Phase2=標準を足す / Phase3=応用で仕上げる
     //   → 30日を通して顔ぶれが変わり、飽きずに段階的にレベルが上がる
@@ -247,9 +255,13 @@ export function build30DayProgram(problemKeys, opts={}){
     timeOfDay = 'any',
     season = null,
     history = [],
+    adjustment = null,   // 途中評価(Day7/14/21)で決まった調整方針
   } = opts;
 
-  const count = COUNT_BY_TIME[timeBudget] || 4;
+  // 途中評価の結果を反映: 続けるのが大変だった週は種目を減らし、
+  // 余裕があった週は1種増やす。1〜7種の範囲に収める。
+  const baseCount = COUNT_BY_TIME[timeBudget] || 4;
+  const count = Math.max(2, Math.min(7, baseCount + (adjustment?.countDelta || 0)));
   // 禁忌種目を除外しつつ、重複回避に必要な数まで候補を確保
   const pool = buildPool(problemKeys, count, contra);
   const prescribed = buildPrescribed(problemKeys);
@@ -279,6 +291,7 @@ export function build30DayProgram(problemKeys, opts={}){
       anchors, excludeIds: prevIds, avoidIds: prev1Ids, maxStretch: 2, phase,
       goal, ageGroup, goalFavorites, prescribed,
       contra, timeOfDay, season, seasonFavorites, lifeStageAvoid, historyBoost,
+      intensityPref: adjustment?.intensity || 'keep',
     });
     training.forEach(ex => { usage[ex.id] = (usage[ex.id] || 0) + 1; });
 

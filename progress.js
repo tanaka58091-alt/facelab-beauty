@@ -147,10 +147,10 @@ export function getJourney(){
     const r = localStorage.getItem(journeyKey());
     const j = r ? JSON.parse(r) : null;
     if (j && typeof j === 'object'){
-      return { startDate:j.startDate||null, done:(j.done&&typeof j.done==='object')?j.done:{}, streak:j.streak||0, lastDoneDate:j.lastDoneDate||null };
+      return { startDate:j.startDate||null, done:(j.done&&typeof j.done==='object')?j.done:{}, streak:j.streak||0, lastDoneDate:j.lastDoneDate||null, log:(j.log&&typeof j.log==='object')?j.log:{}, checkins:(j.checkins&&typeof j.checkins==='object')?j.checkins:{} };
     }
   } catch(e){}
-  return { startDate:null, done:{}, streak:0, lastDoneDate:null };
+  return { startDate:null, done:{}, streak:0, lastDoneDate:null, log:{}, checkins:{} };
 }
 function saveJourney(j){ try { localStorage.setItem(journeyKey(), JSON.stringify(j)); } catch(e){} }
 
@@ -161,11 +161,19 @@ export function currentJourneyDay(){
   return 30;
 }
 
-export function markDayDone(day){
+// 実施の記録。
+//   level: 'full'(できた) / 'partial'(一部できた) / 'skip'(できなかった)
+//   feel : 'easy'(かんたん) / 'ok'(ちょうどいい) / 'hard'(きつい) / 'pain'(違和感あり)
+// レベルと体感は、あとで「途中評価」と「メニューの自動調整」に使う。
+export function markDayDone(day, opts={}){
   const j = getJourney();
   const today = ymd(new Date());
+  const level = opts.level || 'full';
   if (!j.startDate) j.startDate = today;
-  if (!j.done[day]){
+  if (!j.log) j.log = {};
+  j.log[day] = { date: today, level, feel: opts.feel || null };
+  // 「できなかった」は連続日数の対象にしない(記録だけ残す)
+  if (level !== 'skip' && !j.done[day]){
     j.done[day] = today;
     if (j.lastDoneDate !== today){       // 同じ日に複数完了してもストリークは1回だけ加算
       const yst = new Date(); yst.setDate(yst.getDate()-1);
@@ -175,6 +183,70 @@ export function markDayDone(day){
   }
   saveJourney(j);
   return j;
+}
+
+// ===================================================================
+// 途中評価とメニューの自動調整
+//   Day7 / 14 / 21 のタイミングで、それまでの実施状況を振り返る。
+//   ここで得た「実施率」と「体感」を使って、次の期間のメニュー量と
+//   強度を調整する(初日に作った30日を固定しない)。
+// ===================================================================
+export const CHECKIN_DAYS = [7, 14, 21];
+
+// 直近の期間(前回チェックイン〜今)の実施状況を集計
+export function reviewStats(uptoDay){
+  const j = getJourney();
+  const log = j.log || {};
+  const from = Math.max(1, uptoDay - 6);
+  let full=0, partial=0, skip=0, planned=0;
+  const feels = [];
+  for (let d = from; d <= uptoDay; d++){
+    planned++;
+    const e = log[d];
+    if (!e){ if (j.done[d]) full++; continue; }   // 旧データ(記録なし)は完了なら full 扱い
+    if (e.level === 'full') full++;
+    else if (e.level === 'partial') partial++;
+    else skip++;
+    if (e.feel) feels.push(e.feel);
+  }
+  const doneRate = planned ? (full + partial * 0.5) / planned : 0;
+  const count = f => feels.filter(x => x === f).length;
+  return {
+    from, uptoDay, planned, full, partial, skip, doneRate,
+    feels, hardCount: count('hard'), easyCount: count('easy'), painCount: count('pain'),
+  };
+}
+
+// 集計 → 次の期間への調整方針(プログラム生成に渡す)
+export function suggestAdjustment(rv){
+  // 違和感の報告が1回でもあれば、まず強度を落として様子を見る
+  if (rv.painCount > 0) return { kind:'ease', countDelta:-1, intensity:'light',
+    message:'違和感があったとのことなので、次の1週間は軽めのメニューに切り替えます。痛みがあるときは中止してください。' };
+  if (rv.doneRate < 0.5) return { kind:'reduce', countDelta:-1, intensity:'light',
+    message:'続けるのが大変だったようですね。次の1週間は種目数を減らして、まず習慣にすることを優先します。' };
+  if (rv.hardCount >= 3) return { kind:'ease', countDelta:0, intensity:'light',
+    message:'きついと感じた日が多かったので、次の1週間は強度を少し下げます。' };
+  if (rv.doneRate >= 0.85 && rv.easyCount >= 3) return { kind:'levelUp', countDelta:+1, intensity:'up',
+    message:'よく続けられていて、余裕もありそうです。次の1週間は少しレベルを上げます。' };
+  return { kind:'keep', countDelta:0, intensity:'keep',
+    message:'いいペースです。次の1週間もこの調子で続けましょう。' };
+}
+
+// チェックインの記録(同じDayで何度も出さないため)
+export function isCheckinDone(day){ const j = getJourney(); return !!(j.checkins && j.checkins[day]); }
+export function saveCheckin(day, data){
+  const j = getJourney();
+  if (!j.checkins) j.checkins = {};
+  j.checkins[day] = { at: ymd(new Date()), ...data };
+  saveJourney(j);
+  return j;
+}
+// 保存済みの調整方針(最新のもの)を返す
+export function currentAdjustment(){
+  const j = getJourney();
+  const days = Object.keys(j.checkins || {}).map(Number).sort((a,b)=>b-a);
+  if (!days.length) return null;
+  return (j.checkins[days[0]] || {}).adjustment || null;
 }
 
 export function unmarkDayDone(day){

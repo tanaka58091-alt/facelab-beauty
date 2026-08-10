@@ -13,6 +13,7 @@ import {
   saveSnapshot, listSnapshots, clearHistory, deleteSnapshot,
   thumbnailFromCanvas, buildSnapshotMeta, KEY_METRICS, metricImprovement,
   currentJourneyDay, markDayDone, journeyStats, resetJourney,
+  CHECKIN_DAYS, reviewStats, suggestAdjustment, isCheckinDone, saveCheckin, currentAdjustment,
   saveLastSession, getLastSession, clearLastSession,
 } from './progress.js';
 import {
@@ -1701,7 +1702,12 @@ function renderToday(){
   const btnFlow = document.getElementById('btn-today-flow');
   if (btnFlow){
     btnFlow.hidden = false;
-    btnFlow.onclick = () => startTodayFlow(today.training.map(e => e.id), dayNum);
+    // Day番号はクリック時点で取り直す(他経路で進んでいた場合にズレないように)
+    btnFlow.onclick = () => {
+      const d = currentJourneyDay();
+      const day = state.program?.[d - 1] || today;
+      startTodayFlow(day.training.map(e => e.id), d);
+    };
   }
 }
 
@@ -1714,22 +1720,70 @@ function startTodayFlow(ids, dayNum){
   _todayFlow = { ids, idx: 0, dayNum };
   openExerciseModal(EXERCISES[ids[0]]);
 }
-function finishTodayFlow(){
+async function finishTodayFlow(){
   const dayNum = _todayFlow?.dayNum;
   _todayFlow = null;
   closeModal();
   if (dayNum == null) return;
-  markDayDone(dayNum);
+
+  // 今日の体感をワンタップで記録(入力負担を増やさないため1問だけ)
+  const feel = await uiChoice({
+    title: `Day ${dayNum} おつかれさまでした 🎉`,
+    message: '今日はどうでしたか？（次回のメニュー調整に使います）',
+    options: [
+      { value:'easy', label:'😌 かんたんだった', sub:'余裕があれば次から少しレベルを上げます' },
+      { value:'ok',   label:'🙆 ちょうどよかった', sub:'この調子で続けましょう' },
+      { value:'hard', label:'😮‍💨 きつかった',     sub:'次から強度を下げます' },
+      { value:'pain', label:'⚠️ 違和感があった',   sub:'軽いメニューに切り替えます' },
+    ],
+  });
+  markDayDone(dayNum, { level:'full', feel: feel || null });
   renderToday();                       // 次のDayへ進む
   renderProgram(state.currentPhase);   // プログラム側の✓も更新
+
   const st = journeyStats();
-  uiAlert({
-    title: `Day ${dayNum} 完了！おつかれさまでした 🎉`,
+  await uiAlert({
+    title: `Day ${dayNum} 完了！`,
     message: `🔥 連続 <strong>${st.streak}日</strong> ・ 達成 <strong>${st.doneCount}/30</strong><br>${
       st.doneCount >= 30 ? '30日プログラム達成！本当にすごいです 🌸'
       : st.streak >= 7 ? '1週間継続中！顔は毎日の積み重ねで変わります 🌷'
       : '明日もホーム画面の桜アイコンからワンタップで続けましょう 🌸'}`,
   });
+  await maybeRunCheckin(dayNum);
+}
+
+// ===== 途中評価(Day7/14/21) =====
+// 初日に作った30日を固定せず、実施状況と体感に応じて次の1週間を調整する。
+async function maybeRunCheckin(dayNum){
+  if (!CHECKIN_DAYS.includes(dayNum) || isCheckinDone(dayNum)) return;
+  const rv = weeklyReview(dayNum);
+  const adj = suggestAdjustment(rv);
+  const pct = Math.round(rv.doneRate * 100);
+  await uiAlert({
+    title: `📋 ${dayNum}日目の振り返り`,
+    message: `この1週間の実施状況です。<br><br>
+      ✅ できた <strong>${rv.full}日</strong> ／ 🔸 一部 <strong>${rv.partial}日</strong> ／ ・ お休み <strong>${rv.skip}日</strong><br>
+      実施率 <strong>${pct}%</strong><br><br>
+      <span style="color:var(--brand); font-weight:700">${escapeHtml(adj.message)}</span>`,
+  });
+  saveCheckin(dayNum, { review: rv, adjustment: adj });
+  rebuildProgramWithAdjustment();      // 次の期間からメニューに反映
+}
+
+function weeklyReview(dayNum){ return reviewStats(dayNum); }
+
+// 調整方針を反映して30日プログラムを作り直す(実施済みのDayはそのまま)
+function rebuildProgramWithAdjustment(){
+  if (!state.problems || !state.problems.length) return;
+  const adj = currentAdjustment();
+  state.program = build30DayProgram(state.problems.map(p => p.key), {
+    timeBudget: state.timeBudget, goal: state.goal, priorityKeys: state.priorityKeys,
+    ageGroup: state.ageGroup, lifestyle: state.lifestyle, contra: state.contra,
+    lifeStage: state.lifeStage, timeOfDay: state.timeOfDay, season: state.season,
+    history: listSnapshots(), adjustment: adj,
+  });
+  renderToday();
+  renderProgram(state.currentPhase);
 }
 
 // 継続の仕組み: Day進行・連続日数・30マス進捗・完了ボタン
@@ -1762,10 +1816,23 @@ function renderJourneyBar(dayNum){
       : `<button class="jr-done-btn" id="jr-done-btn" type="button">Day ${dayNum} を完了する ✓</button>`}
   `;
   const btn = document.getElementById('jr-done-btn');
-  if (btn) btn.addEventListener('click', () => {
-    markDayDone(dayNum);
-    renderToday();      // 次のDayへ進む
-    renderProgram(state.currentPhase); // プログラム側の✓も更新
+  if (btn) btn.addEventListener('click', async () => {
+    const d = currentJourneyDay();   // クリック時点のDayを使う
+    // どこまでできたかを記録(入力は1タップ)
+    const level = await uiChoice({
+      title: `Day ${d} の記録`,
+      message: '今日はどこまでできましたか？',
+      options: [
+        { value:'full',    label:'✅ ぜんぶできた' },
+        { value:'partial', label:'🔸 一部だけできた', sub:'それでも続いています' },
+        { value:'skip',    label:'・ 今日はお休み',   sub:'記録だけ残します' },
+      ],
+    });
+    if (!level) return;
+    markDayDone(d, { level });
+    renderToday();
+    renderProgram(state.currentPhase);
+    if (level !== 'skip') await maybeRunCheckin(d);
   });
 }
 
@@ -2080,6 +2147,32 @@ function renderInstallPromo(){
     _deferredInstall = null;
     try { localStorage.setItem(INSTALL_PROMO_KEY, 'done'); } catch(e){}
     host.hidden = true;
+  });
+}
+
+// 選択式のダイアログ。options=[{value,label,sub}] を縦に並べ、選んだ value を返す。
+// キャンセル(×/背景)は null。
+function uiChoice({ title, message='', options=[], cancelText='' }){
+  return new Promise(resolve => {
+    _dialogResolve = (v) => resolve(v === DIALOG_CANCEL ? null : v);
+    const btns = options.map((o,i) => `
+      <button class="ui-choice" data-v="${escapeHtml(String(o.value))}" type="button">
+        <span class="ui-choice-label">${o.label}</span>
+        ${o.sub ? `<span class="ui-choice-sub">${escapeHtml(o.sub)}</span>` : ''}
+      </button>`).join('');
+    els.modalBody.innerHTML = `
+      <div class="ui-dialog">
+        <h3>${escapeHtml(title)}</h3>
+        ${message ? `<p class="ui-dialog-msg">${message}</p>` : ''}
+        <div class="ui-choices">${btns}</div>
+        ${cancelText ? `<div class="ui-dialog-actions"><button class="btn-ghost" id="ui-cancel" type="button">${escapeHtml(cancelText)}</button></div>` : ''}
+      </div>`;
+    showModal();
+    els.modalBody.querySelectorAll('.ui-choice').forEach(b => {
+      b.addEventListener('click', () => { settleDialog(b.dataset.v); closeModal(); });
+    });
+    const c = document.getElementById('ui-cancel');
+    if (c) c.addEventListener('click', () => closeModal());
   });
 }
 
