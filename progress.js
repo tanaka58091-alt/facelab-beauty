@@ -67,8 +67,94 @@ export function thumbnailFromCanvas(canvas, maxW = 200){
   catch(e){ return null; }
 }
 
+// ===================================================================
+// Before/After の「比較できるか」判定
+//
+// 同じ人でも、顔の向き・明るさ・写る大きさが変われば、指標は動く。
+// 条件が違う2枚を並べて「改善しました」と言うのは、事実ではない。
+// そこで撮影条件を一緒に保存しておき、条件が変わっている指標は
+// 「比べられません」と正直に示す。
+//
+// どの条件がどの指標を狂わせるか:
+//   pose  … 顔の向き。輪郭・左右差・口元の位置がまとめて変わる
+//   light … 明るさ。肌のきめ・トーンの見え方が変わる
+//   size  … 顔の写る大きさ。細かいテクスチャの解像度が変わる
+// ===================================================================
+const SENSITIVE_TO = {
+  midlineTilt:     ['pose'],
+  eyeHeightDiff:   ['pose'],
+  browHeightDiff:  ['pose'],
+  mouthTilt:       ['pose'],
+  mouthCornerDrop: ['pose'],
+  cheekDrop:       ['pose'],
+  nasolabialIndex: ['pose'],
+  faceWHRatio:     ['pose'],
+  wrinkleIdx:      ['light', 'size'],
+  toneEvenness:    ['light'],
+};
+// この差を超えたら「条件が変わった」とみなす
+const SHOT_TOLERANCE = {
+  yawDeg:   10,    // 左右の向き(度)
+  pitchDeg:  8,    // 上下の向き(度)
+  bright:   45,    // 平均の明るさ(0-255)
+  sizeRatio: 1.30, // 顔の写る大きさの比
+};
+
+// 解析結果から「撮影条件」を取り出す
+export function buildShotConditions({ metrics, pixels, photoQuality }){
+  const num = v => (typeof v === 'number' && isFinite(v)) ? Math.round(v * 100) / 100 : null;
+  return {
+    yawDeg:   num(metrics?.yawDeg),
+    pitchDeg: num(metrics?.pitchDeg),
+    // 向きが推定値のときは判定に使わない(推定の誤差を「条件の違い」と誤認しないため)
+    poseExact: metrics?.poseSource === 'matrix',
+    bright:   num(pixels?.luminanceOverall),
+    faceSize: num(photoQuality?.faceW),
+  };
+}
+
+// 2枚の撮影条件を比べ、どの条件がそろっていないかを返す
+export function compareShotConditions(before, after){
+  const a = before?.shot, b = after?.shot;
+  if (!a || !b) return { known: false, broken: new Set(), notes: [] };
+  const broken = new Set();
+  const notes = [];
+  if (a.poseExact && b.poseExact){
+    const dYaw = Math.abs((b.yawDeg ?? 0) - (a.yawDeg ?? 0));
+    const dPit = Math.abs((b.pitchDeg ?? 0) - (a.pitchDeg ?? 0));
+    if (dYaw > SHOT_TOLERANCE.yawDeg){
+      broken.add('pose');
+      notes.push(`顔の向き（左右）が前回と ${dYaw.toFixed(0)}° 違います`);
+    }
+    if (dPit > SHOT_TOLERANCE.pitchDeg){
+      broken.add('pose');
+      notes.push(`顔の向き（上下）が前回と ${dPit.toFixed(0)}° 違います`);
+    }
+  }
+  if (a.bright != null && b.bright != null && Math.abs(b.bright - a.bright) > SHOT_TOLERANCE.bright){
+    broken.add('light');
+    notes.push(b.bright > a.bright ? '前回より明るい場所で撮られています' : '前回より暗い場所で撮られています');
+  }
+  if (a.faceSize && b.faceSize){
+    const ratio = Math.max(a.faceSize, b.faceSize) / Math.min(a.faceSize, b.faceSize);
+    if (ratio > SHOT_TOLERANCE.sizeRatio){
+      broken.add('size');
+      notes.push(b.faceSize > a.faceSize ? '前回より顔が大きく写っています' : '前回より顔が小さく写っています');
+    }
+  }
+  return { known: true, broken, notes };
+}
+
+// その指標が今回の2枚で比べられるか
+export function isMetricComparable(metricKey, broken){
+  if (!broken || !broken.size) return true;
+  const sensitive = SENSITIVE_TO[metricKey];
+  if (!sensitive) return true;
+  return !sensitive.some(kind => broken.has(kind));
+}
+
 // スコア・主要指標・タイプ名から保存メタを構築
-export function buildSnapshotMeta({ score, grade, faceType, ageGroup, goal, problems, metrics, percentile }){
+export function buildSnapshotMeta({ score, grade, faceType, ageGroup, goal, problems, metrics, percentile, pixels, photoQuality }){
   const topProblems = (problems || []).slice(0, 3).map(p => ({
     key: p.key, title: p.title, severity: p.severity,
   }));
@@ -82,6 +168,8 @@ export function buildSnapshotMeta({ score, grade, faceType, ageGroup, goal, prob
     topProblems,
     // 主要 4 指標のみ保存して比較しやすくする
     keyMetrics: pickKeyMetrics(metrics),
+    // 撮影条件(次回との比較可能性を判定するため)
+    shot: buildShotConditions({ metrics, pixels, photoQuality }),
   };
 }
 function pickKeyMetrics(m){

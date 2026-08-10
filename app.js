@@ -12,6 +12,7 @@ import { buildMotionPlayerHTML, initMotionPlayer, buildStepPanelsHTML, buildHowL
 import {
   saveSnapshot, listSnapshots, clearHistory, deleteSnapshot,
   thumbnailFromCanvas, buildSnapshotMeta, KEY_METRICS, metricImprovement,
+  compareShotConditions, isMetricComparable,
   currentJourneyDay, markDayDone, journeyStats, resetJourney,
   CHECKIN_DAYS, reviewStats, suggestAdjustment, isCheckinDone, saveCheckin, currentAdjustment,
   saveLastSession, getLastSession, clearLastSession,
@@ -649,6 +650,9 @@ els.btnAnalyze.addEventListener('click', async () => {
         goal: state.goal,
         problems: state.problems,
         metrics: state.result.metrics,
+        // 撮影条件も一緒に残す(次回と比べられるかの判定に使う)
+        pixels: state.result.pixels,
+        photoQuality: state.photoQuality,
       });
       saveSnapshot({ thumbDataUrl: thumb, meta });
       // 前回セッションを保存(写真なしで結果・プログラムを再表示できるように)
@@ -1062,15 +1066,25 @@ function showBeforeAfter(before, after){
   const sign = sd >= 0 ? '+' : '';
   const tone = sd > 0 ? 'up' : sd < 0 ? 'down' : 'flat';
   const km1 = before.keyMetrics || {}, km2 = after.keyMetrics || {};
+
+  // === 2枚の撮影条件がそろっているかを先に確認する ===
+  // 向き・明るさ・写る大きさが違えば指標は動く。そこを見ずに「改善」と言わない。
+  const shot = compareShotConditions(before, after);
+
   // 各指標の変化を集計(絶対値が小さいほど改善)
   const changes = Object.keys(km2)
     .filter(k => k in km1 && (k in METRIC_LABEL))
     .map(k => {
       const d = km2[k] - km1[k];
       const improve = metricImprovement(METRIC_DIR[k], km1[k], km2[k]); // - なら改善(方向考慮)
-      return { k, label: METRIC_LABEL[k], from: km1[k], to: km2[k], d, improve };
+      // 撮影条件が変わっている指標は、変化を「結果」として扱わない
+      const comparable = isMetricComparable(k, shot.broken);
+      return { k, label: METRIC_LABEL[k], from: km1[k], to: km2[k], d, improve, comparable };
     });
   const metricRows = changes.map(c => {
+    if (!c.comparable){
+      return `<div class="ba-row skip"><span>${c.label}</span><i>${c.from} → ${c.to}</i><b><em>条件差で比較不可</em></b></div>`;
+    }
     const dStr = (c.d >= 0 ? '+' : '') + (Math.round(c.d*1000)/1000);
     const cls = c.improve < -0.002 ? 'up' : c.improve > 0.002 ? 'down' : 'flat';
     const badge = cls === 'up' ? '改善' : cls === 'down' ? '悪化' : '維持';
@@ -1078,9 +1092,10 @@ function showBeforeAfter(before, after){
   }).join('');
 
   // === 変化点のハイライト ===
-  const improved = changes.filter(c => c.improve < -0.002).sort((a,b) => a.improve - b.improve);
-  const worsened = changes.filter(c => c.improve >  0.002).sort((a,b) => b.improve - a.improve);
-  let highlight = '';
+  const usable  = changes.filter(c => c.comparable);
+  const skipped = changes.filter(c => !c.comparable);
+  const improved = usable.filter(c => c.improve < -0.002).sort((a,b) => a.improve - b.improve);
+  const worsened = usable.filter(c => c.improve >  0.002).sort((a,b) => b.improve - a.improve);
   const chips = [];
   if (improved.length){
     chips.push(`<span class="ba-hl-chip up">✨ 最も改善：${improved[0].label}</span>`);
@@ -1089,22 +1104,51 @@ function showBeforeAfter(before, after){
   if (worsened.length){
     chips.push(`<span class="ba-hl-chip down">⚠ 注意：${worsened[0].label}</span>`);
   }
-  if (!improved.length && !worsened.length){
+  if (!improved.length && !worsened.length && usable.length){
     chips.push(`<span class="ba-hl-chip flat">大きな変化なし（現状維持）</span>`);
   }
-  const headline = sd > 0
-    ? `スコアが <b>${sd}pt</b> アップ！この調子で続けましょう 🌸`
-    : sd < 0
-      ? `スコアは <b>${Math.abs(sd)}pt</b> ダウン。撮影条件（光・表情・角度）も影響します。`
-      : `スコアは横ばい。フォームを見直して継続を 💪`;
-  highlight = `
-    <div class="ba-highlight ${tone}">
+  if (skipped.length){
+    chips.push(`<span class="ba-hl-chip flat">${skipped.length}項目は撮影条件が違うため比較を保留</span>`);
+  }
+
+  // 見出し。条件がそろっていないときは、スコア差を「成果」として語らない。
+  // スコアは全指標の合成なので、条件が1つでも変わっていれば比較対象にしない。
+  const scoreComparable = shot.broken.size === 0;
+  const headline = !scoreComparable
+    ? `今回は前回と<b>撮影条件が違う</b>ため、スコアの差は変化として比べられません。`
+    : sd > 0
+      ? `スコアが <b>${sd}pt</b> アップ！この調子で続けましょう 🌸`
+      : sd < 0
+        ? `スコアは <b>${Math.abs(sd)}pt</b> ダウン。撮影条件（光・表情・角度）も影響します。`
+        : `スコアは横ばい。フォームを見直して継続を 💪`;
+
+  // 条件が違う場合は、何が違ったか・次はどう撮れば比べられるかを伝える
+  let conditionNote = '';
+  if (shot.known && shot.notes.length){
+    conditionNote = `
+      <div class="ba-condition">
+        <div class="ba-condition-head">📷 前回と撮影条件が違います</div>
+        <ul class="ba-condition-list">${shot.notes.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+        <p class="ba-condition-hint">次回は<strong>前回と同じ場所・同じ明るさ・同じ距離</strong>で、カメラを目の高さに構えて正面から撮ると、変化をそのまま比べられます。</p>
+      </div>`;
+  } else if (!shot.known){
+    conditionNote = `
+      <div class="ba-condition soft">
+        <p class="ba-condition-hint">※ どちらかの写真は撮影条件の記録がないため、条件がそろっているかは確認できていません。</p>
+      </div>`;
+  }
+
+  const highlight = `
+    <div class="ba-highlight ${scoreComparable ? tone : 'flat'}">
       <div class="ba-hl-head">${headline}</div>
       <div class="ba-hl-chips">${chips.join('')}</div>
-    </div>`;
+    </div>
+    ${conditionNote}`;
 
   els.baMeta.innerHTML = `
-    <div class="ba-summary"><strong>${days}日</strong> でスコア <span class="ba-delta ${tone}">${sign}${sd}</span> 変化</div>
+    <div class="ba-summary"><strong>${days}日</strong> でスコア
+      <span class="ba-delta ${scoreComparable ? tone : 'flat'}">${sign}${sd}</span>
+      ${scoreComparable ? '変化' : '差（条件差あり・参考値）'}</div>
     ${highlight}
     <div class="ba-metric-cap">指標ごとの変化（数値が0に近いほど良好）</div>
     <div class="ba-metric-list">${metricRows}</div>

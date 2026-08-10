@@ -1259,6 +1259,9 @@ body{
   border: 1px solid var(--border); border-radius: 14px;
 }
 .ba-title{ font-size: 14px; font-weight: 700; color: var(--brand); margin: 0 0 10px; }
+/* 写真の比較窓(正方形・はみ出しを隠す)と、その下の解析テキストを分ける。
+   テキストを窓の中に入れると切れてしまうため、必ず ba-wrap 直下に置くこと */
+.ba-wrap{ width: 100%; }
 .ba-stage{
   position: relative; width: 100%; aspect-ratio: 1/1;
   max-width: 480px; margin: 0 auto;
@@ -1341,6 +1344,19 @@ body{
 .ba-row.down b em{ background: #FFF0F3; color: var(--bad); }
 .ba-row.flat b{ color: var(--muted); }
 .ba-row.flat b em{ background: #F4F0F2; color: var(--muted); }
+/* 撮影条件が違って比べられない指標 */
+.ba-row.skip{ background: #FAF8F9; border-style: dashed; color: var(--muted); }
+.ba-row.skip b em{ background: #F4F0F2; color: var(--muted); }
+
+/* 撮影条件の違いのお知らせ */
+.ba-condition{
+  margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+  background: #FFFBEF; border: 1px solid #F2E3B8;
+}
+.ba-condition.soft{ background: #FAF8F9; border-color: var(--border); }
+.ba-condition-head{ font-weight: 700; font-size: 13px; color: var(--ink); margin-bottom: 6px; }
+.ba-condition-list{ margin: 0 0 8px; padding-left: 20px; font-size: 12.5px; line-height: 1.9; color: var(--ink-2); }
+.ba-condition-hint{ margin: 0; font-size: 12px; line-height: 1.8; color: var(--muted); }
 
 /* ============ ANALYSIS WARNINGS (Phase 3-13/14) ============ */
 .analysis-warnings{

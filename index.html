@@ -620,8 +620,10 @@
     </div>
     <div class="score-trend" id="score-trend" hidden></div>
     <div class="progress-timeline" id="progress-timeline"></div>
-    <div class="ba-stage" id="ba-stage" hidden>
-      <div class="ba-pane">
+    <!-- ba-stage は正方形+overflow:hidden の「写真の比較窓」。
+         解析テキスト(ba-meta)を中に置くと窓からはみ出して切れるため、外に出す -->
+    <div class="ba-wrap" id="ba-stage" hidden>
+      <div class="ba-stage">
         <img class="ba-img ba-before" id="ba-before" alt="Before"/>
         <img class="ba-img ba-after" id="ba-after" alt="After"/>
         <div class="ba-label ba-label-before">Before</div>

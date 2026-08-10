@@ -478,7 +478,9 @@ export function checkPhotoQuality(rawLms, opts={}){
   }
 
   const blocked = issues.some(i => i.level === 'block');
-  return { ok: !blocked, blocked, issues, pose };
+  // faceW/faceH は「顔が画面のどれくらいを占めているか」。
+  // 次回の写真と撮影条件をそろえられているかの判定にも使う。
+  return { ok: !blocked, blocked, issues, pose, faceW, faceH };
 }
 
 // ===================================================================
