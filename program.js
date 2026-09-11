@@ -25,25 +25,36 @@ const SEASON_BIAS = {
 };
 // 季節おすすめ種目 (やんわり優先)
 const SEASON_FAVORITE = {
-  spring: ['cheekPump','neckFront','breathGlow','fullFlow','faceRelax','bloodFlowPose','freshFacePose'],
-  summer: ['neckFront','chinTuck','jawSlide','neckSide','cheekAir','clavicleLymph','neckMassage','tongueOut'],
-  autumn: ['breathGlow','faceRelax','tongueRoll','fullFlow','postureFace','faceMassage','diaphragmBreath'],
-  winter: ['eyeWideOpen','foreheadSmooth','browRaise','breathGlow','templeRelease','bloodFlowPose','eyeRelease'],
+  spring: ['cheekPump','neckFront','breathGlow','fullFlow','faceRelax','bloodFlowPose','freshFacePose',
+           'faceTapAll','cheekBoneLift','noseBreathTrain'],
+  summer: ['neckFront','chinTuck','jawSlide','neckSide','cheekAir','clavicleLymph','neckMassage','tongueOut',
+           'parotidDrain','jawLineTrace','sternoRelease'],
+  autumn: ['breathGlow','faceRelax','tongueRoll','fullFlow','postureFace','faceMassage','diaphragmBreath',
+           'nightReset','chestOpen','tongueUpHold'],
+  winter: ['eyeWideOpen','foreheadSmooth','browRaise','breathGlow','templeRelease','bloodFlowPose','eyeRelease',
+           'palming','templeCircle','faceTapAll'],
 };
 // 月経・PMS期にはハード強度や息止め系を控えめに
 const LIFESTAGE_AVOID = {
-  menstrual:  ['breathGlow','aiueoTrain','lionPose','neckIso','bloodFlowPose'],
-  postpartum: ['breathGlow','lionPose','neckIso'],
+  menstrual:  ['breathGlow','aiueoTrain','lionPose','neckIso','bloodFlowPose',
+               'cheekResist','submentalPush','tongueDownPress','tongueSidePush'],
+  postpartum: ['breathGlow','lionPose','neckIso',
+               'cheekResist','submentalPush','tongueDownPress'],
 };
 
 // 生活習慣 → その人に効きやすい種目群。
 // 理由文で「〜を挟みます」と書く以上、実際にメニューへ反映させる。
 const LIFESTYLE_FAVORITE = {
-  posture_smartphone: ['postureFace','chinTuck','neckFront','neckBack','shoulderRoll','scalpRelease'],
-  posture_desk:       ['postureFace','shoulderRoll','neckSide','neckBack','focusShift','eyeRelease'],
-  diet_hardChew:      ['masseterRelease','masseterTap','masseterStretch','templeRelease','jawSlide','earYoga'],
-  stress_high:        ['glabellaRelease','foreheadSmooth','faceRelax','breathGlow','diaphragmBreath','scalpRelease'],
-  sleep_short:        ['faceLymphDrain','clavicleLymph','neckMassage','cheekPump','tongueOut','earYoga'],
+  posture_smartphone: ['postureFace','chinTuck','neckFront','neckBack','shoulderRoll','scalpRelease',
+                       'headSlideBack','chinSideTuck','wallPosture','sternoRelease'],
+  posture_desk:       ['postureFace','shoulderRoll','neckSide','neckBack','focusShift','eyeRelease',
+                       'scapulaSqueeze','chestOpen','palming','wallPosture'],
+  diet_hardChew:      ['masseterRelease','masseterTap','masseterStretch','templeRelease','jawSlide','earYoga',
+                       'masseterDeep','jawDrop','innerCheekRelease','templeCircle'],
+  stress_high:        ['glabellaRelease','foreheadSmooth','faceRelax','breathGlow','diaphragmBreath','scalpRelease',
+                       'nightReset','palming','jawDrop','noseBreathTrain'],
+  sleep_short:        ['faceLymphDrain','clavicleLymph','neckMassage','cheekPump','tongueOut','earYoga',
+                       'parotidDrain','faceTapAll','jawLineTrace','noseBreathTrain'],
 };
 function lifestyleFavorites(life){
   const s = new Set();
@@ -86,12 +97,18 @@ const GOAL_ZONE_BIAS = {
 
 // goal → 「目的に合う」エクササイズID(優先プール)
 const GOAL_FAVORITE = {
-  liftup:    ['cheekLift','cheekLiftAssist','mouthCornerLift','nasolabialStretch','cheekPump','balloonFace','fullFlow','smileHold','chinUpPose'],
-  symmetry:  ['symmetrySmile','oneSideSmile','browSolo','chopstickTrain','aiueoTrain','balloonFace','mouthCornerTongue'],
-  antiAging: ['foreheadSmooth','glabellaRelease','hairlineLift','browUpDown','browRaise','eyeWideOpen','faceRelax','breathGlow','faceMassage'],
-  shrink:    ['chinTuck','chinPress','neckFront','octopusPose','jawSlide','cheekPump','masseterRelease','clavicleLymph','neckMassage'],
-  eyes:      ['eyeWideOpen','binocularPose','outerEyeLift','lowerLidLift','munchFace','eyeRelease','browRaise','eyeRoll'],
-  overall:   ['fullFlow','cheekLift','mouthCornerLift','tongueRoll','chinTuck','freshFacePose','smileHold','breathGlow'],
+  liftup:    ['cheekLift','cheekLiftAssist','mouthCornerLift','nasolabialStretch','cheekPump','balloonFace','fullFlow','smileHold','chinUpPose',
+              'cheekBoneLift','midfaceLift','smileSquint','cheekTongueSweep','mouthWideI'],
+  symmetry:  ['symmetrySmile','oneSideSmile','browSolo','chopstickTrain','aiueoTrain','balloonFace','mouthCornerTongue',
+              'cheekHoldOne','lipCornerPull','chinSideTuck','browInnerLift','tongueSidePush'],
+  antiAging: ['foreheadSmooth','glabellaRelease','hairlineLift','browUpDown','browRaise','eyeWideOpen','faceRelax','breathGlow','faceMassage',
+              'foreheadHold','browBonePress','foreheadTap','faceTapAll','nightReset'],
+  shrink:    ['chinTuck','chinPress','neckFront','octopusPose','jawSlide','cheekPump','masseterRelease','clavicleLymph','neckMassage',
+              'submentalPush','tongueUpHold','jawLineTrace','headSlideBack','parotidDrain','masseterDeep'],
+  eyes:      ['eyeWideOpen','binocularPose','outerEyeLift','lowerLidLift','munchFace','eyeRelease','browRaise','eyeRoll',
+              'upperLidHold','squintHold','eyeSqueeze','orbitPress','palming','eyeFigure8'],
+  overall:   ['fullFlow','cheekLift','mouthCornerLift','tongueRoll','chinTuck','freshFacePose','smileHold','breathGlow',
+              'faceTapAll','cheekBoneLift','tongueUpHold','headSlideBack','strawPose'],
 };
 
 // 年代 → 強度のバイアス(高年齢は heavy にペナルティ、若年は heavy をやや優先)
@@ -129,8 +146,10 @@ function buildPool(problemKeys, count=4, contra=[], lifeFavorites=new Set()){
   // 生活習慣に合う種目も候補に入れる(候補に無ければ優先しようがない)
   lifeFavorites.forEach(id => { if (ok(id)) pool.add(id); });
   // 「昨日と同じ」を避けるには1日分の2倍+α、
-  // 「30日飽きない」には最低24種は欲しい（不足分は全種目から補充）
-  const need = Math.max(count * 3 + 4, 26);
+  // 「30日飽きない」には十分な数が要る（不足分は全種目から補充）。
+  // v6.11 で種目が120種になったため下限を引き上げた。
+  // 主力種目が薄まらないよう、選定側では使用回数の重み付けで補正している。
+  const need = Math.max(count * 4 + 6, 34);
   if (pool.size < need){
     for (const id of Object.keys(EXERCISES)){
       if (pool.size >= need) break;
@@ -189,7 +208,15 @@ function pickLeastUsed(idList, usage, count, opts){
   const score = (id) => {
     const meta = EXERCISE_META[id] || {};
     const fullMeta = getMeta(id);
-    let s = usage[id] || 0;
+    // 使用回数の重み。種目数が増えると「まだ使っていない種目」が常に大量にあるため、
+    // 素の使用回数で比べると、悩みの主力種目が数回で追い出されてしまう。
+    // 役割ごとに「使ったときの重さ」を変えて、主力は30日を通して戻ってくるようにする。
+    // (1.0=ふつうに減点 / 0.45=使っても半分しか減点されない＝繰り返し出やすい)
+    const useWeight = anchorsP.has(id) ? 0.45
+                    : anchorsN.has(id) ? 0.65
+                    : prescribed.has(id) ? 0.8
+                    : 1;
+    let s = (usage[id] || 0) * useWeight;
     // ⭐優先の悩みの主力種目は、他の要素に打ち消されない強さで優先する。
     // (使用回数は1回ごとに+1なので、-2.2なら2回使っても他候補より前に来る)
     if (anchorsP.has(id)) s -= 2.2;

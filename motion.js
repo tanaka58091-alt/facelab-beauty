@@ -1,5 +1,5 @@
 // ===================================================================
-// MOTION GUIDE v6 — 顔ヨガ68種・イラストと文章の「1ソース統合」
+// MOTION GUIDE v6 — 顔ヨガ120種・イラストと文章の「1ソース統合」
 //
 // ★設計: 手順は steps 配列 1箇所だけに定義する（部位別データファイル）。
 //   - 絵 (buildStepPanelsHTML) … label + cue + overlay
@@ -17,15 +17,17 @@ import { UPPER_MOTIONS } from './motion-data-upper.js';
 import { MID_MOTIONS }   from './motion-data-mid.js';
 import { LOWER_MOTIONS } from './motion-data-lower.js';
 import { WHOLE_MOTIONS } from './motion-data-whole.js';
+import { EXT_MOTIONS }   from './motion-data-ext.js';
 
 export { MOTION_DEFS };
 
-// 68種（額・眉間・目14 / 頬・口・舌24 / あご・エラ・首19 / 全体11）
+// 120種（既存76種 + 拡張44種）
 const MOTIONS = {
   ...UPPER_MOTIONS,
   ...MID_MOTIONS,
   ...LOWER_MOTIONS,
   ...WHOLE_MOTIONS,
+  ...EXT_MOTIONS,
 };
 
 export function listMotionIds(){ return Object.keys(MOTIONS); }

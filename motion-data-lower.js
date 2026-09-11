@@ -32,7 +32,7 @@ export const LOWER_MOTIONS = {
   chinPress: { name:'あごの下を舌と指で押し合う', reps:'5秒キープ × 10回', duration:28, steps:[
     { label:'あごの下に親指', cue:'あごの先の内側、やわらかい所に当てる',
       text:'背すじを伸ばして座り、親指をあごの下（骨の内側のやわらかいところ）に当てる',
-      overlay: hand(100,214)+target(100,208,6,'あごの下') },
+      overlay: hand(132,218)+target(100,208,6,'あごの下') },
     { label:'押し合う', cue:'指は上へ、舌は上あごへ押す', count:'1…2',
       text:'親指で軽く上に押し返しながら、舌を上あごへ強く押し付ける',
       overlay: hand(100,216)+arrow(100,216,100,206)+target(100,158,7,'上あご')+arrow(100,172,100,156) },
@@ -109,7 +109,7 @@ export const LOWER_MOTIONS = {
   octopusPose: { name:'鎖骨を押さえて、タコ口で上を向く', reps:'5秒キープ × 3回', duration:28, steps:[
     { label:'鎖骨を押さえる', cue:'両手で鎖骨を軽く押さえる',
       text:'座って背すじを伸ばし、両手で鎖骨を軽く押さえる（皮ふを下に固定するイメージ）',
-      overlay: hand(84,226)+hand(116,226)+target(100,228,6,'鎖骨') },
+      overlay: hand(84,226)+hand(134,222)+target(100,228,6,'鎖骨') },
     { label:'タコ口を作る', cue:'口をタコのようにすぼめて前へ', count:'1…2',
       text:'口をタコのようにすぼめて、前に突き出す',
       overlay: target(100,182,9,'タコ口')+arrow(100,178,100,200,'#5BA8FF')+hand(84,226)+hand(116,226) },
@@ -286,10 +286,10 @@ export const LOWER_MOTIONS = {
       overlay: target(100,214,7,'首') },
     { label:'前へ押し合う', cue:'おでこと手で押し合う（息は止めない）', count:'10秒',
       text:'手のひらをおでこに当て、頭は前へ、手は後ろへ押し合う。首が動かないまま10秒（息は止めない）',
-      overlay: hand(100,88)+target(100,104,7,'押し合う') },
+      overlay: hand(132,88)+target(100,104,7,'押し合う') },
     { label:'後ろへ押し合う', cue:'後頭部と手で押し合う（首は動かさない）', count:'10秒',
       text:'両手を後頭部に組み、頭は後ろへ、手は前へ押し合う（10秒）',
-      overlay: hand(100,64)+target(100,110,7,'押し合う') },
+      overlay: hand(132,64)+target(100,110,7,'押し合う') },
     { label:'右へ押し合う', cue:'右手を右のこめかみに当てて', count:'10秒',
       text:'右手を右のこめかみに当て、頭は右へ、手は左へ押し合う（10秒）',
       overlay: hand(148,112)+arrow(128,112,146,112)+arrow(154,112,136,112,'#5BA8FF') },
@@ -303,7 +303,7 @@ export const LOWER_MOTIONS = {
   neckMassage: { name:'首すじを上から下へ流す', reps:'左右 各15回', duration:26, steps:[
     { label:'耳の下に手を当てる', cue:'右手を左の首すじ（耳の下）に',
       text:'座って肩の力を抜き、右手を左の首すじ（耳の下）に当てる',
-      overlay: hand(70,186)+target(72,184,6,'耳の下') },
+      overlay: hand(48,196)+target(72,184,6,'耳の下') },
     { label:'上から下へ流す', cue:'耳の下から鎖骨へ、軽く押しながら', count:'15回',
       text:'耳の下から鎖骨へ向かって、軽く押しながらすーっと流す。15回くり返す',
       overlay: hand(76,204)+arrow(72,184,84,224) },
@@ -317,7 +317,7 @@ export const LOWER_MOTIONS = {
   clavicleLymph: { name:'鎖骨の上のくぼみをゆるめる', reps:'左右 各10秒', duration:24, steps:[
     { label:'くぼみを探す', cue:'鎖骨の上のくぼみを指で探す',
       text:'座って、鎖骨の上のくぼみを指で探す',
-      overlay: hand(84,230)+target(84,228,6,'鎖骨の上') },
+      overlay: hand(56,224)+target(84,228,6,'鎖骨の上') },
     { label:'やさしく押す', cue:'指の腹で、軽く押さえる（強く押さない）', count:'10秒',
       text:'指の腹で、10秒くらい軽く押さえる（強く押さないこと）',
       overlay: hand(84,230)+circleRub(84,228,7) },
@@ -334,7 +334,7 @@ export const LOWER_MOTIONS = {
   shoulderRoll: { name:'肩を大きくまわす', reps:'前後 各5回', duration:24, base:'body', steps:[
     { label:'指先を肩に乗せる', cue:'座って、指先を両肩に軽く乗せる',
       text:'座って背すじを伸ばし、指先を両肩に軽く乗せる',
-      overlay: hand(52,110)+hand(148,110)+target(52,110,6,'肩')+target(148,110,6) },
+      overlay: hand(40,124)+hand(160,124)+target(52,110,6,'肩')+target(148,110,6) },
     { label:'後ろへまわす', cue:'ひじで大きな円を描くように、後ろへ', count:'5回',
       text:'ひじで大きな円を描くように、後ろへゆっくり5回まわす',
       overlay: hand(52,110)+hand(148,110)+arrowPath('M62 124 Q40 106 60 98 Q80 108 68 124')+arrowPath('M138 124 Q160 106 140 98 Q120 108 132 124') },

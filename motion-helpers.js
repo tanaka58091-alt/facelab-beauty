@@ -50,11 +50,14 @@ export const UPPER_BODY = `
 `;
 
 // 動かす場所（ピンクの●）
+// label は手アイコン(✋)や顔の線と重なることがあるため、白フチ(paint-order:stroke)を
+// 入れて、どんな背景の上でも読めるようにしている。
 export const target = (cx, cy, r=8, label='') => `
   <g class="mv-target">
     <circle cx="${cx}" cy="${cy}" r="${r+4}" fill="none" stroke="#FF4D7A" stroke-width="2" opacity="0.5" class="mv-target-ring"/>
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="#FF4D7A" opacity="0.85" class="mv-target-dot"/>
-    ${label ? `<text x="${cx}" y="${cy-r-6}" text-anchor="middle" font-size="9" fill="#FF4D7A" font-weight="700">${label}</text>` : ''}
+    ${label ? `<text x="${cx}" y="${cy-r-7}" text-anchor="middle" font-size="9.5" fill="#FF4D7A" font-weight="700"
+      stroke="#fff" stroke-width="2.5" stroke-linejoin="round" paint-order="stroke">${label}</text>` : ''}
   </g>`;
 
 // 動かす向き（ピンク矢印／青矢印＝ふくらます・前へ・息）

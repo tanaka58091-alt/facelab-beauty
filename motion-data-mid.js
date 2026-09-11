@@ -122,7 +122,7 @@ export const MID_MOTIONS = {
   cheekBoneMassage: { name:'ほお骨のまわりをゆるめる', reps:'左右 各10秒', duration:26, steps:[
     { label:'ほお骨を探す', cue:'目の下の骨のふちを指で探す',
       text:'座って肩の力を抜き、目の下の骨（ほお骨）のふちを指で探す',
-      overlay: hand(70,140)+target(70,138,6,'ほお骨') },
+      overlay: hand(48,152)+target(70,138,6,'ほお骨') },
     { label:'骨の下をなぞる', cue:'鼻の横から耳の方へ、軽く押しながら', count:'10秒',
       text:'ほお骨の下のくぼみを、鼻の横から耳の方へ、軽く押しながらなぞる（10秒）',
       overlay: hand(66,146)+arrow(88,146,58,142) },

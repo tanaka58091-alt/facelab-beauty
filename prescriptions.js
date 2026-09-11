@@ -1,13 +1,14 @@
 // ===================================================================
 // PRESCRIPTIONS — お悩み別の処方 / 種目メタ / 禁忌
 //
-// EXERCISES(68種) に対する
+// EXERCISES(120種) に対する
 //   - PRESCRIPTION_MAP : お悩み16種 → 効く種目（先頭ほど優先＝アンカー）
 //   - EXERCISE_META    : zone / intensity / tier（プログラム生成のフィルタ）
 //   - EXERCISE_META_EXT: 道具 / 時間帯 / 禁忌 / 注意文
 // ===================================================================
+import { META_ADD, META_EXT_ADD, PRESCRIPTION_ADD } from './prescriptions-ext.js';
 
-export const PRESCRIPTION_MAP = {
+const PRESCRIPTION_BASE = {
   facialAsymmetry: { training: ['symmetrySmile','oneSideRelease','oneSideSmile','browSolo','chopstickTrain','mouthCornerLift','fullFlow','postureFace','aiueoTrain','balloonFace','tongueStretch'] },
   mouthCornerDown: { training: ['mouthCornerLift','cornerDepressorRelease','mouthCornerTongue','chopstickTrain','cheekLift','smileHold','aiueoTrain','beakPose','fullFlow','lipPucker'] },
   nasolabialFold:  { training: ['nasolabialStretch','cheekLiftAssist','balloonFace','cheekLift','tongueRoll','noseCare','chinUpPose','mouthCornerTongue','upperLipTrain','cheekPump','fishFace'] },
@@ -27,9 +28,19 @@ export const PRESCRIPTION_MAP = {
   general:         { training: ['fullFlow','cheekLift','mouthCornerLift','tongueRoll','aiueoTrain','chinTuck','browRaise','earYoga','faceLymphDrain','acupressure','scalpRelease','breathGlow','faceRelax','postureFace','smileHold','neckFront'] },
 };
 
+// 拡張44種(v6.11)を各お悩みの処方に追加する。
+// 既存の並び順(先頭ほど優先＝アンカー)は変えず、後ろに足すだけにして
+// 「これまで選ばれていた主力種目」が入れ替わらないようにする。
+export const PRESCRIPTION_MAP = Object.fromEntries(
+  Object.entries(PRESCRIPTION_BASE).map(([key, val]) => {
+    const add = (PRESCRIPTION_ADD[key] || []).filter(id => !val.training.includes(id));
+    return [key, { ...val, training: [...val.training, ...add] }];
+  })
+);
+
 // zone: upper(額・目・眉) / mid(頬・鼻・口輪) / lower(口角・あご・首)
 // intensity: light / medium / heavy    tier: 1(基礎) / 2(標準) / 3(応用)
-export const EXERCISE_META = {
+const EXERCISE_META_BASE = {
   // 額・眉間
   browRaise:        { zone:'upper', intensity:'light',  tier:1 },
   browUpDown:       { zone:'upper', intensity:'light',  tier:1 },
@@ -117,6 +128,7 @@ export const EXERCISE_META = {
   acupressure:      { zone:'mid',   intensity:'light',  tier:2 },
   noseCare:         { zone:'mid',   intensity:'light',  tier:2 },
 };
+export const EXERCISE_META = { ...EXERCISE_META_BASE, ...META_ADD };
 
 export const CONTRA_LABEL = {
   tmj:           '顎関節症・顎の痛み',
@@ -129,7 +141,7 @@ export const CONTRA_LABEL = {
 export const TIME_OF_DAY_LABEL = { morning:'🌅 朝向け', evening:'🌙 夜向け', any:'⏱ いつでも' };
 export const TOOLS_LABEL = { none:'手ぶら', fingers:'指(手)', pen:'ペン・割り箸', mirror:'鏡' };
 
-export const EXERCISE_META_EXT = {
+const EXERCISE_META_EXT_BASE = {
   // --- 指でほぐす系（敏感肌は注意） ---
   foreheadSmooth:  { tools:['fingers'], contra:['skinSensitive'], timeOfDay:['evening'] },
   glabellaRelease: { tools:['fingers'], contra:['skinSensitive'], timeOfDay:['evening'] },
@@ -210,6 +222,7 @@ export const EXERCISE_META_EXT = {
   acupressure:            { tools:['none'], contra:['glaucoma'] },
   noseCare:               { tools:['fingers'], contra:['skinSensitive'] },
 };
+export const EXERCISE_META_EXT = { ...EXERCISE_META_EXT_BASE, ...META_EXT_ADD };
 
 export function getMeta(id){
   const base = EXERCISE_META[id] || { zone:'mid', intensity:'medium', tier:2 };

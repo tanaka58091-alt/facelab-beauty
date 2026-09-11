@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>顔ヨガ68種 カタログ｜FaceLab Beauty</title>
+<title>顔ヨガ種目カタログ｜FaceLab Beauty</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -47,7 +47,7 @@
 <body>
 <div class="cat-wrap">
   <div class="cat-head">
-    <h1>顔ヨガ 68種 カタログ</h1>
+    <h1 id="cat-title">顔ヨガ 種目カタログ</h1>
     <p>カードをクリックすると、手順イラストと文章が開きます。<br>絵の番号と文章の番号は必ず一致しています（①の絵＝①の文）。</p>
     <div class="cat-stats" id="stats"></div>
   </div>
@@ -66,17 +66,33 @@
 import { EXERCISES, getMeta, TOOLS_LABEL, CONTRA_LABEL, TIME_OF_DAY_LABEL } from './exercises.js';
 import { buildStepPanelsHTML, buildHowListHTML, MOTION_DEFS, getMotion } from './motion.js';
 
-const GROUPS = [
-  { key:'brow',  title:'額・眉間（6種）', ids:['browRaise','browUpDown','foreheadSmooth','glabellaRelease','hairlineLift','browSolo'] },
-  { key:'eye',   title:'目（8種）', ids:['eyeWideOpen','binocularPose','lowerLidLift','outerEyeLift','munchFace','eyeRelease','eyeRoll','blinkReset'] },
-  { key:'cheek', title:'頬（8種）', ids:['cheekLift','cheekLiftAssist','cheekPump','balloonFace','cheekAir','cheekBoneMassage','nasolabialStretch','fishFace'] },
-  { key:'mouth', title:'口・唇・鼻の下（10種）', ids:['mouthCornerLift','mouthCornerTongue','aiueoTrain','chopstickTrain','beakPose','upperLipTrain','lipOpenClose','lipPucker','lipRelease','bigO'] },
-  { key:'tongue',title:'舌（6種）', ids:['tongueRoll','tonguePress','tongueOut','tongueStretch','lionPose','swallowTrain'] },
-  { key:'chin',  title:'あご・フェイスライン（7種）', ids:['chinTuck','chinPress','chinMassage','jawSlide','mouthOpen','octopusPose','chinUpPose'] },
-  { key:'jaw',   title:'エラ・こめかみ（4種）', ids:['masseterRelease','masseterTap','templeRelease','masseterStretch'] },
-  { key:'neck',  title:'首・肩（8種）', ids:['neckFront','neckSide','neckBack','neckDiagonal','neckIso','neckMassage','clavicleLymph','shoulderRoll'] },
-  { key:'whole', title:'全体・呼吸・姿勢・左右差（11種）', ids:['fullFlow','faceRelax','breathGlow','diaphragmBreath','bloodFlowPose','freshFacePose','faceMassage','postureFace','symmetrySmile','oneSideSmile','smileHold'] },
+const GROUP_DEFS = [
+  { key:'brow',  title:'額・眉間', ids:['browRaise','browUpDown','foreheadSmooth','glabellaRelease','hairlineLift','browSolo',
+        'browInnerLift','foreheadHold','browBonePress','foreheadTap','scalpRelease'] },
+  { key:'eye',   title:'目', ids:['eyeWideOpen','binocularPose','lowerLidLift','outerEyeLift','munchFace','eyeRelease','eyeRoll','blinkReset',
+        'focusShift','upperLidHold','squintHold','eyeSqueeze','orbitPress','palming','eyeFigure8'] },
+  { key:'cheek', title:'頬', ids:['cheekLift','cheekLiftAssist','cheekPump','balloonFace','cheekAir','cheekBoneMassage','nasolabialStretch','fishFace',
+        'cheekBoneLift','cheekResist','smileSquint','cheekTongueSweep','midfaceLift','cheekHoldOne','noseCare'] },
+  { key:'mouth', title:'口・唇・鼻の下', ids:['mouthCornerLift','mouthCornerTongue','aiueoTrain','chopstickTrain','beakPose','upperLipTrain','lipOpenClose','lipPucker','lipRelease','bigO',
+        'cornerDepressorRelease','strawPose','lipRollIn','whistlePose','mouthWideI','lipCornerPull','lipUpDownAir'] },
+  { key:'tongue',title:'舌', ids:['tongueRoll','tonguePress','tongueOut','tongueStretch','lionPose','swallowTrain',
+        'tongueUpHold','tongueSidePush','tongueGumTrace','tongueDownPress'] },
+  { key:'chin',  title:'あご・フェイスライン', ids:['chinTuck','chinPress','chinMassage','jawSlide','mouthOpen','octopusPose','chinUpPose',
+        'chinKissUp','jawResist','submentalPush','jawLineTrace','chinSideTuck'] },
+  { key:'jaw',   title:'エラ・こめかみ', ids:['masseterRelease','masseterTap','templeRelease','masseterStretch',
+        'earYoga','oneSideRelease','masseterDeep','templeCircle','jawDrop','innerCheekRelease'] },
+  { key:'neck',  title:'首・肩・姿勢', ids:['neckFront','neckSide','neckBack','neckDiagonal','neckIso','neckMassage','clavicleLymph','shoulderRoll',
+        'chestOpen','scapulaSqueeze','sternoRelease','wallPosture','headSlideBack','parotidDrain'] },
+  { key:'whole', title:'全体・呼吸・リラックス・左右差', ids:['fullFlow','faceRelax','breathGlow','diaphragmBreath','bloodFlowPose','freshFacePose','faceMassage','postureFace','symmetrySmile','oneSideSmile','smileHold',
+        'faceLymphDrain','acupressure','noseBreathTrain','faceTapAll','nightReset'] },
 ];
+// 未分類の取りこぼしを出さない安全網。種目を足しても一覧から漏れない。
+const LISTED = new Set(GROUP_DEFS.flatMap(g => g.ids));
+const UNLISTED = Object.keys(EXERCISES).filter(id => !LISTED.has(id));
+const GROUPS = [
+  ...GROUP_DEFS.map(g => ({ ...g, ids: g.ids.filter(id => EXERCISES[id]) })),
+  ...(UNLISTED.length ? [{ key:'other', title:'その他', ids: UNLISTED }] : []),
+].map(g => ({ ...g, title: `${g.title}（${g.ids.length}種）` }));
 
 // 統計
 const all = Object.keys(EXERCISES);
@@ -87,7 +103,10 @@ document.getElementById('stats').innerHTML = `
   <div class="stat"><b>${all.length-relax}</b><span>鍛える</span></div>
   <div class="stat"><b>${relax}</b><span>ゆるめる</span></div>
   <div class="stat"><b>${panels}</b><span>手順イラスト</span></div>
-  <div class="stat"><b>9</b><span>部位</span></div>`;
+  <div class="stat"><b>${GROUPS.length}</b><span>部位</span></div>`;
+// 見出しの種目数もデータから出す（数字の書き忘れで実態とズレないように）
+document.getElementById('cat-title').textContent = `顔ヨガ ${all.length}種 カタログ`;
+document.title = `顔ヨガ${all.length}種 カタログ｜FaceLab Beauty`;
 
 // フィルタ
 let filter = 'all';

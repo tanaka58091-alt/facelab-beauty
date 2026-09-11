@@ -455,6 +455,13 @@ window.addEventListener('resize', _ctaOnScroll, { passive: true });
 const _stickyBtn = document.getElementById('sticky-analyze');
 if (_stickyBtn) _stickyBtn.addEventListener('click', () => els.btnAnalyze.click());
 
+// ヒーローの「表情筋トレ ◯種」をデータから埋める。
+// 種目を足したときに、HTMLの数字だけ古いまま残るのを防ぐ。
+(() => {
+  const el = document.getElementById('stat-ex-count');
+  if (el) el.textContent = String(Object.keys(EXERCISES).length);
+})();
+
 function collectSymptoms(){
   state.symptoms = Array.from(
     els.symptomChips.querySelectorAll('input[type="checkbox"]:checked')

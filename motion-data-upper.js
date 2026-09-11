@@ -1,5 +1,5 @@
 // ===================================================================
-// MOTION DATA — 額・眉間・目（14種）
+// MOTION DATA — 額・眉間・目（16種。拡張分は motion-data-ext.js）
 //
 // 研究知見: 額・眉間・目のまわり（浅い層の筋肉）は「ゆるめる」と
 // 緊張・硬さが下がり弾力が上がる。鍛える種目とゆるめる種目を併用する。
@@ -67,7 +67,7 @@ export const UPPER_MOTIONS = {
   glabellaRelease: { name:'眉間を指でゆるめる', reps:'15秒', duration:20, steps:[
     { label:'眉間に中指を当てる', cue:'両手の中指を眉間に軽く当てる',
       text:'座って肩の力を抜き、両手の中指の腹を眉間に軽く当てる',
-      overlay: hand(100,104)+target(100,104,6,'眉間') },
+      overlay: hand(128,104)+target(100,104,6,'眉間') },
     { label:'小さく円を描く', cue:'力を入れず、小さく円を描いてほぐす', count:'10秒',
       text:'力を入れず、小さく円を描くように10秒ほぐす',
       overlay: hand(100,104)+circleRub(100,104,8) },
@@ -81,7 +81,7 @@ export const UPPER_MOTIONS = {
   hairlineLift: { name:'生えぎわをほぐして引き上げる', reps:'15秒', duration:22, steps:[
     { label:'生えぎわに指を当てる', cue:'指の腹を、髪の生えぎわに当てる',
       text:'座って、両手の指の腹を髪の生えぎわ（おでこの上のふち）に当てる',
-      overlay: hand(100,74)+target(100,70,6,'生えぎわ') },
+      overlay: hand(134,78)+target(100,70,6,'生えぎわ') },
     { label:'ジグザグにほぐす', cue:'生えぎわに沿って小さく動かす', count:'10秒',
       text:'生えぎわに沿って、指を小さくジグザグに動かしながら10秒ほぐす',
       overlay: hand(78,74)+hand(122,74)+circleRub(78,74,7)+circleRub(122,74,7) },
@@ -278,7 +278,7 @@ export const UPPER_MOTIONS = {
       overlay: hand(58,96)+hand(142,96)+arrow(58,104,58,86)+arrow(142,104,142,86) },
     { label:'後頭部の付け根', cue:'首と頭の境目を親指で押す', count:'10秒',
       text:'後頭部の付け根（首と頭の境目のくぼみ）を親指で押し、小さく円を描く（10秒）',
-      overlay: hand(100,60)+target(100,56,7,'付け根') },
+      overlay: hand(132,64)+target(100,56,7,'付け根') },
     { label:'完了', cue:'目がパッと開き、頭が軽い 🌷',
       text:'おつかれさまでした。頭がゆるむと、額・まぶた・顔全体が引き上がりやすくなります 🌷', overlay:'' },
   ]},
