@@ -18,6 +18,8 @@ import { MID_MOTIONS }   from './motion-data-mid.js';
 import { LOWER_MOTIONS } from './motion-data-lower.js';
 import { WHOLE_MOTIONS } from './motion-data-whole.js';
 import { EXT_MOTIONS }   from './motion-data-ext.js';
+// 生成済みの手順イラスト一覧（publish_steps.sh が illust/steps/*.webp から自動生成）
+import { STEP_IMAGES } from './illust/steps-index.js';
 
 export { MOTION_DEFS };
 
@@ -31,6 +33,90 @@ const MOTIONS = {
 };
 
 export function listMotionIds(){ return Object.keys(MOTIONS); }
+
+// ===================================================================
+// 手順イラスト（画像版）
+//   illust/steps/<種目ID>-<連番2桁>.webp を優先表示し、無ければ従来のSVGに戻す。
+//   絵の無いステップ（「戻す」「完了」等）は共有画像を使う:
+//     途中の絵なし → _shared-neutral（基準の無表情）／最後 → _shared-done（微笑み）
+//   文とパネル番号は同じ steps[] から出るので、画像化しても「①の絵＝①の文」は崩れない。
+// ===================================================================
+export const STEP_IMG_BASE = './illust/steps/';
+export function stepImageKey(exerciseId, steps, idx, base){
+  const s = steps[idx];
+  const hasOverlay = !!(s && (s.overlay || '').trim());
+  const suffix = base === 'body' ? '-body' : '';   // 上半身ベースは上半身の共有画像を使う
+  if (!hasOverlay) return (idx === steps.length - 1 ? '_shared-done' : '_shared-neutral') + suffix;
+  return `${exerciseId}-${String(idx + 1).padStart(2, '0')}`;
+}
+export function stepImageSrc(exerciseId, steps, idx, base){
+  if (base === undefined) base = (MOTIONS[exerciseId] || {}).base;
+  return `${STEP_IMG_BASE}${stepImageKey(exerciseId, steps, idx, base)}.webp`;
+}
+// その種目の全ステップぶんの画像が揃っているか。
+// 揃っていない種目は従来のSVGで表示し、1つの種目の中で画像とSVGが混ざらないようにする。
+export function exerciseHasImages(exerciseId){
+  const m = MOTIONS[exerciseId]; if (!m) return false;
+  return m.steps.every((_, i) => STEP_IMAGES.has(stepImageKey(exerciseId, m.steps, i, m.base)));
+}
+// 一覧カード用の「代表ステップ」: キープ系 → 矢印のある最初のステップ → 2番目 の順で選ぶ
+export function heroStepIndex(exerciseId){
+  const steps = getMotion(exerciseId).steps;
+  const has = (s, re) => re.test(s.overlay || '');
+  let i = steps.findIndex((s, k) => k > 0 && k < steps.length - 1 && /キープ/.test(s.label || '') && (s.overlay || '').trim());
+  if (i < 0) i = steps.findIndex((s, k) => k > 0 && k < steps.length - 1 && has(s, /mv-arrow/));
+  if (i < 0) i = steps.findIndex((s, k) => k > 0 && k < steps.length - 1 && (s.overlay || '').trim());
+  return i < 0 ? 0 : i;
+}
+export function heroImageSrc(exerciseId){
+  if (!exerciseHasImages(exerciseId)) return null;
+  const m = getMotion(exerciseId);
+  return stepImageSrc(exerciseId, m.steps, heroStepIndex(exerciseId), m.base);
+}
+
+// ===================================================================
+// 画像の上に「動かす場所・向き」を重ねるための座標変換
+//   手順データの座標系(200×230・顔ベース)は、基準イラストの顔ランドマークを
+//   実測して最小二乗で対応づけてある（誤差 約12〜16px / 1024px）。
+//   これにより、矢印や目印は AI に描かせず、既存の手順データから正確な位置に重ねられる。
+//   上半身ベース(base:'body')は上半身の基準画像から別途較正する（未較正なら重ねない）。
+// ===================================================================
+// 顔ベース: 線形（目・あご・口・眉・エラ 12点の最小二乗。誤差 約12〜16px）
+const FACE_CAL = { sx: 4.312, tx: 76.1, sy: 3.385, ty: -21.7 };
+// 上半身ベース: 手順データの体は首が長めなので、縦は区間ごとの補間で合わせる
+//   （頭頂17→65 / 目46→269 / あご75→434 / 肩110→505 / 胸135→640 / お腹170→1000）
+const BODY_CAL = { sx: 5.4, tx: -36,
+  yKnots: [[17,65],[46,269],[75,434],[110,505],[135,640],[170,1000],[216,1200]] };
+export function overlayCalibration(m){ return (m.base === 'body') ? BODY_CAL : FACE_CAL; }
+
+function interp(knots, v){
+  if (v <= knots[0][0]) { const [[a,b],[c,d]] = knots; return b + (v - a) * (d - b) / (c - a); }
+  for (let i = 1; i < knots.length; i++){
+    const [a,b] = knots[i-1], [c,d] = knots[i];
+    if (v <= c) return b + (v - a) * (d - b) / (c - a);
+  }
+  const [a,b] = knots[knots.length-2], [c,d] = knots[knots.length-1];
+  return b + (v - a) * (d - b) / (c - a);
+}
+export function remapOverlay(ov, cal){
+  if (!ov || !cal) return '';
+  const X = v => (cal.sx * v + cal.tx).toFixed(1);
+  const Y = v => (cal.yKnots ? interp(cal.yKnots, v) : (cal.sy * v + cal.ty)).toFixed(1);
+  const S = cal.yKnots ? cal.sx : (cal.sx + cal.sy) / 2;
+  const path = d => d.replace(/([MLQTCS])\s*([^MLQTCSZmlqtcsz]+)/g, (_, c, nums) =>
+    c + nums.trim().split(/[\s,]+/).map((n, i) => (i % 2 === 0 ? X(+n) : Y(+n))).join(' '));
+  return ov
+    .replace(/\bcx="(-?[\d.]+)"/g, (_, v) => `cx="${X(+v)}"`)
+    .replace(/\bcy="(-?[\d.]+)"/g, (_, v) => `cy="${Y(+v)}"`)
+    .replace(/\br="(-?[\d.]+)"/g,  (_, v) => `r="${(+v * S).toFixed(1)}"`)
+    .replace(/\bx1="(-?[\d.]+)"/g, (_, v) => `x1="${X(+v)}"`)
+    .replace(/\bx2="(-?[\d.]+)"/g, (_, v) => `x2="${X(+v)}"`)
+    .replace(/\by1="(-?[\d.]+)"/g, (_, v) => `y1="${Y(+v)}"`)
+    .replace(/\by2="(-?[\d.]+)"/g, (_, v) => `y2="${Y(+v)}"`)
+    .replace(/<text x="(-?[\d.]+)" y="(-?[\d.]+)"/g, (_, x, y) => `<text x="${X(+x)}" y="${Y(+y)}"`)
+    .replace(/translate\((-?[\d.]+),(-?[\d.]+)\)/g, (_, x, y) => `translate(${X(+x)},${Y(+y)})`)
+    .replace(/\bd="([^"]+)"/g, (_, d) => `d="${path(d)}"`);
+}
 
 export function getMotion(exerciseId){
   const m = MOTIONS[exerciseId] || MOTIONS.cheekLift;
@@ -53,13 +139,19 @@ export function buildHowListHTML(exerciseId){
 export function buildStepPanelsHTML(exerciseId){
   const m = getMotion(exerciseId);
   const baseBody = m.base === 'body' ? UPPER_BODY : FACE_BODY;
+  const cal = overlayCalibration(m);
+  const useImg = exerciseHasImages(exerciseId);
   const panels = m.steps.map((s, i) => {
     const overlay = s.overlay || '';
     const isDone = !overlay.trim();
+    const onImg = useImg ? remapOverlay(overlay, cal) : '';
     return `
       <figure class="step-panel${isDone ? ' is-done' : ''}">
         <div class="step-panel-num">${i + 1}</div>
-        <div class="step-panel-stage">
+        <div class="step-panel-stage${useImg ? '' : ' no-img'}">
+          ${useImg ? `<img class="step-panel-img" src="${stepImageSrc(exerciseId, m.steps, i, m.base)}" alt="${(s.label || '').replace(/"/g,'')}"
+               loading="lazy" decoding="async" onerror="this.parentNode.classList.add('no-img')">` : ''}
+          ${onImg ? `<svg viewBox="0 0 1024 1024" class="step-panel-overlay-img" aria-hidden="true">${onImg}</svg>` : ''}
           <svg viewBox="0 0 200 230" class="step-panel-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${(s.label || '').replace(/"/g,'')}">
             ${baseBody}
             <g class="step-panel-overlay">${overlay}</g>
@@ -99,7 +191,12 @@ export function buildMotionPlayerHTML(exerciseId){
   const baseBody = m.base === 'body' ? UPPER_BODY : FACE_BODY;
   return `
     <div class="motion-player" data-pattern="${exerciseId}" data-duration="${m.duration}">
-      <div class="motion-stage">
+      <div class="motion-stage${exerciseHasImages(exerciseId) ? '' : ' no-img'}">
+        <div class="motion-img-wrap">
+          <img class="motion-img" src="${STEP_IMG_BASE}_shared-neutral${m.base === 'body' ? '-body' : ''}.webp" alt="" decoding="async"
+               onerror="this.closest('.motion-stage').classList.add('no-img')">
+          <svg viewBox="0 0 1024 1024" class="motion-overlay-img" aria-hidden="true"></svg>
+        </div>
         <svg viewBox="0 0 200 230" class="motion-svg" preserveAspectRatio="xMidYMid meet">
           ${baseBody}
           <g class="motion-overlay"></g>
@@ -141,6 +238,16 @@ export function initMotionPlayer(rootEl, exerciseId){
   const cueEl    = rootEl.querySelector('.motion-step-cue');
   const overlayG = rootEl.querySelector('.motion-overlay');
   const stage    = rootEl.querySelector('.motion-stage');
+  const imgEl    = rootEl.querySelector('.motion-img');
+  const imgOvG   = rootEl.querySelector('.motion-overlay-img');
+  const cal      = overlayCalibration(m);
+  // 画像版の手順イラストがある場合は、ステップごとに画像を差し替える（無ければSVGのまま）
+  function setImage(idx){
+    if (!imgEl || stage.classList.contains('no-img')) return;
+    const src = idx == null ? `${STEP_IMG_BASE}_shared-neutral${m.base === 'body' ? '-body' : ''}.webp` : stepImageSrc(exerciseId, m.steps, idx, m.base);
+    if (imgEl.getAttribute('src') !== src) imgEl.setAttribute('src', src);
+    if (imgOvG) imgOvG.innerHTML = idx == null ? '' : remapOverlay(m.steps[idx].overlay || '', cal);
+  }
 
   let playing = false, timerId = null, start = 0, elapsed = 0, currentStep = -1;
 
@@ -159,6 +266,7 @@ export function initMotionPlayer(rootEl, exerciseId){
     countEl.textContent = s.count ? `(${s.count})` : '';
     cueEl.textContent = s.cue || '';
     setOverlay(s.overlay || '');
+    setImage(idx);
   }
   function tick(){
     if (!playing) return;

@@ -743,7 +743,12 @@ body{
   width: 64px; height: 64px; flex-shrink: 0;
   background: #fff; border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
 }
+/* 代表ステップの画像があれば表示、無ければ従来のSVGアイコン */
+.ex-illust-img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.ex-illust:not(.no-img) > svg{ display: none; }
+.ex-illust.no-img .ex-illust-img{ display: none; }
 .ex-svg{ width: 56px; height: 56px; }
 .ex-info{ flex: 1; min-width: 0; }
 .ex-cat{
@@ -1060,6 +1065,9 @@ body{
   width: 200px; height: 220px;
   max-width: 100%;
 }
+.motion-stage .motion-img{ width: 220px; height: 220px; max-width: 100%; object-fit: cover; border-radius: 12px; display: block; background: #FFF5F7; }
+.motion-stage:not(.no-img) .motion-svg{ display: none; }
+.motion-stage.no-img .motion-img{ display: none; }
 .motion-overlay-hint{
   position: absolute; bottom: 8px;
   font-size: 11px; color: var(--muted);
@@ -1647,6 +1655,26 @@ body{
   display: flex; justify-content: center;
 }
 .step-panel-svg{ width: 100%; height: auto; max-height: 200px; display: block; }
+/* 画像版の手順イラスト。読めた場合は画像、読めなければ .no-img が付いてSVGに戻る */
+.step-panel-img{ width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px; display: block; background: #FFF5F7; }
+.step-panel-stage:not(.no-img) .step-panel-svg{ display: none; }
+.step-panel-stage.no-img .step-panel-img{ display: none; }
+.step-panel-stage{ position: relative; }
+/* 画像の上に重ねる「動かす場所・向き」（手順データから座標変換して描く） */
+.step-panel-overlay-img{
+  position: absolute; left: 4px; top: 4px; width: calc(100% - 8px); aspect-ratio: 1 / 1;
+  pointer-events: none;
+}
+.step-panel-stage.no-img .step-panel-overlay-img{ display: none; }
+/* 写実寄りのイラストに合わせ、目印は「輪」・矢印は太めに。手は本人の手が描かれているので出さない */
+.step-panel-overlay-img .mv-hand, .motion-overlay-img .mv-hand{ display: none; }
+.step-panel-overlay-img .mv-target-dot, .motion-overlay-img .mv-target-dot{ fill: none; stroke: #FF4D7A; stroke-width: 5; opacity: .9; }
+.step-panel-overlay-img .mv-target-ring, .motion-overlay-img .mv-target-ring{ display: none; }
+.step-panel-overlay-img .mv-arrow, .motion-overlay-img .mv-arrow{ stroke-width: 6; }
+.step-panel-overlay-img text, .motion-overlay-img text{ font-size: 34px; stroke-width: 8px; }
+.motion-img-wrap{ position: relative; width: 220px; height: 220px; max-width: 100%; }
+.motion-overlay-img{ position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.motion-stage.no-img .motion-img-wrap{ display: none; }
 .step-panel-cap{ margin-top: 8px; text-align: center; }
 .step-panel-label{
   font-size: 13.5px; font-weight: 700; color: var(--ink);

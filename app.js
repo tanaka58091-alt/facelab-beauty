@@ -8,7 +8,7 @@ import {
 import { EXERCISES, getMeta, CONTRA_LABEL, TIME_OF_DAY_LABEL, TOOLS_LABEL, PRESCRIPTION_MAP, isExerciseAllowed } from './exercises.js';
 import { pickTodayMenu, build30DayProgram } from './program.js';
 import { getKnowledgeFor } from './knowledge.js';
-import { buildMotionPlayerHTML, initMotionPlayer, buildStepPanelsHTML, buildHowListHTML, MOTION_DEFS } from './motion.js';
+import { buildMotionPlayerHTML, initMotionPlayer, buildStepPanelsHTML, buildHowListHTML, MOTION_DEFS, heroImageSrc } from './motion.js';
 import {
   saveSnapshot, listSnapshots, clearHistory, deleteSnapshot,
   thumbnailFromCanvas, buildSnapshotMeta, KEY_METRICS, metricImprovement,
@@ -1936,7 +1936,7 @@ function exerciseCard(ex, opts={}){
   const coreBadge = opts.core ? '<span class="ex-core">まずはこれだけ</span>' : '';
   return `
     <div class="exercise-card${opts.core ? ' is-core' : ''}" data-ex="${ex.id}">
-      <div class="ex-illust">${ex.illustration}</div>
+      <div class="ex-illust${heroImageSrc(ex.id) ? '' : ' no-img'}">${heroImageSrc(ex.id) ? `<img class="ex-illust-img" src="${heroImageSrc(ex.id)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.classList.add('no-img')">` : ''}${ex.illustration}</div>
       <div class="ex-info">
         <span class="ex-cat training">トレーニング</span>${coreBadge}
         <h4>${ex.name}</h4>
@@ -2085,7 +2085,7 @@ function openDayModal(d){
     <div style="display:grid; gap:14px">
       ${d.training.map(ex => `
         <div class="exercise-card" data-ex="${ex.id}">
-          <div class="ex-illust">${ex.illustration}</div>
+          <div class="ex-illust${heroImageSrc(ex.id) ? '' : ' no-img'}">${heroImageSrc(ex.id) ? `<img class="ex-illust-img" src="${heroImageSrc(ex.id)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.classList.add('no-img')">` : ''}${ex.illustration}</div>
           <div class="ex-info">
             <span class="ex-cat training">トレーニング</span>
             <h4>${ex.name}</h4>
