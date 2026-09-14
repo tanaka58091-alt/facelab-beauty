@@ -19,7 +19,7 @@ import { LOWER_MOTIONS } from './motion-data-lower.js';
 import { WHOLE_MOTIONS } from './motion-data-whole.js';
 import { EXT_MOTIONS }   from './motion-data-ext.js';
 // 生成済みの手順イラスト一覧（publish_steps.sh が illust/steps/*.webp から自動生成）
-import { STEP_IMAGES } from './illust/steps-index.js';
+import { STEP_IMAGES, OVERLAY_SKIP } from './illust/steps-index.js';
 
 export { MOTION_DEFS };
 
@@ -144,7 +144,7 @@ export function buildStepPanelsHTML(exerciseId){
   const panels = m.steps.map((s, i) => {
     const overlay = s.overlay || '';
     const isDone = !overlay.trim();
-    const onImg = useImg ? remapOverlay(overlay, cal) : '';
+    const onImg = (useImg && !OVERLAY_SKIP.has(stepImageKey(exerciseId, m.steps, i, m.base))) ? remapOverlay(overlay, cal) : '';
     return `
       <figure class="step-panel${isDone ? ' is-done' : ''}">
         <div class="step-panel-num">${i + 1}</div>
@@ -246,7 +246,7 @@ export function initMotionPlayer(rootEl, exerciseId){
     if (!imgEl || stage.classList.contains('no-img')) return;
     const src = idx == null ? `${STEP_IMG_BASE}_shared-neutral${m.base === 'body' ? '-body' : ''}.webp` : stepImageSrc(exerciseId, m.steps, idx, m.base);
     if (imgEl.getAttribute('src') !== src) imgEl.setAttribute('src', src);
-    if (imgOvG) imgOvG.innerHTML = idx == null ? '' : remapOverlay(m.steps[idx].overlay || '', cal);
+    if (imgOvG) imgOvG.innerHTML = (idx == null || OVERLAY_SKIP.has(stepImageKey(exerciseId, m.steps, idx, m.base))) ? '' : remapOverlay(m.steps[idx].overlay || '', cal);
   }
 
   let playing = false, timerId = null, start = 0, elapsed = 0, currentStep = -1;
