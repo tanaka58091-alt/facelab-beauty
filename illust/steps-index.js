@@ -502,6 +502,9 @@ export const STEP_IMAGES = new Set([
   "upperLipTrain-04",
   "upperLipTrain-05",
   "whistlePose-01",
+  "whistlePose-02",
+  "whistlePose-03",
+  "whistlePose-05",
 ]);
 // 頭を傾ける・向きを変えるステップ: 正面基準の矢印がズレるため、画像だけを見せて重ね矢印を省く（顔位置検査で判定）
 export const OVERLAY_SKIP = new Set([
@@ -528,4 +531,7 @@ export const OVERLAY_SKIP = new Set([
   "neckSide-04",
   "octopusPose-02",
   "octopusPose-03",
+  "palming-03",
+  "sternoRelease-01",
+  "sternoRelease-04",
 ]);
