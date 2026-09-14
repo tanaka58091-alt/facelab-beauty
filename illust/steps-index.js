@@ -239,6 +239,7 @@ export const STEP_IMAGES = new Set([
   "innerCheekRelease-02",
   "innerCheekRelease-03",
   "innerCheekRelease-04",
+  "innerCheekRelease-05",
   "jawDrop-01",
   "jawDrop-02",
   "jawDrop-03",
@@ -386,6 +387,15 @@ export const STEP_IMAGES = new Set([
   "oneSideSmile-01",
   "oneSideSmile-02",
   "oneSideSmile-03",
+  "oneSideSmile-04",
+  "oneSideSmile-05",
+  "orbitPress-01",
+  "orbitPress-02",
+  "orbitPress-03",
+  "orbitPress-04",
+  "outerEyeLift-01",
+  "outerEyeLift-02",
+  "outerEyeLift-03",
 ]);
 // 頭を傾ける・向きを変えるステップ: 正面基準の矢印がズレるため、画像だけを見せて重ね矢印を省く（顔位置検査で判定）
 export const OVERLAY_SKIP = new Set([
