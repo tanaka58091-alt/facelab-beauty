@@ -1,5 +1,6 @@
 // 自動生成: publish_steps.sh（illust/steps/*.webp の一覧）
 export const STEP_IMAGES = new Set([
+  "_shared-done-body",
   "_shared-done",
   "_shared-neutral-body",
   "_shared-neutral",
@@ -115,6 +116,11 @@ export const STEP_IMAGES = new Set([
   "cheekTongueSweep-02",
   "cheekTongueSweep-03",
   "cheekTongueSweep-04",
+  "chestOpen-01",
+  "chestOpen-02",
+  "chestOpen-03",
+  "chestOpen-04",
+  "chestOpen-05",
   "chinKissUp-01",
   "chinKissUp-02",
   "chinKissUp-03",
@@ -156,6 +162,9 @@ export const STEP_IMAGES = new Set([
   "cornerDepressorRelease-02",
   "cornerDepressorRelease-03",
   "cornerDepressorRelease-04",
+  "diaphragmBreath-01",
+  "diaphragmBreath-02",
+  "diaphragmBreath-04",
   "earYoga-01",
   "earYoga-02",
   "earYoga-03",
