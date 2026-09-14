@@ -482,6 +482,15 @@ export const STEP_IMAGES = new Set([
   "tongueSidePush-03",
   "tongueSidePush-04",
   "tongueStretch-01",
+  "tongueStretch-02",
+  "tongueStretch-03",
+  "tongueStretch-04",
+  "tongueStretch-05",
+  "tongueStretch-06",
+  "tongueUpHold-01",
+  "tongueUpHold-03",
+  "tongueUpHold-05",
+  "upperLidHold-01",
 ]);
 // 頭を傾ける・向きを変えるステップ: 正面基準の矢印がズレるため、画像だけを見せて重ね矢印を省く（顔位置検査で判定）
 export const OVERLAY_SKIP = new Set([
