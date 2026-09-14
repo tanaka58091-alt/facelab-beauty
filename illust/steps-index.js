@@ -430,7 +430,18 @@ export const STEP_IMAGES = new Set([
   "sternoRelease-03",
   "sternoRelease-04",
   "strawPose-01",
+  "strawPose-02",
   "strawPose-03",
+  "strawPose-05",
+  "submentalPush-01",
+  "submentalPush-02",
+  "submentalPush-03",
+  "submentalPush-04",
+  "submentalPush-05",
+  "swallowTrain-01",
+  "swallowTrain-02",
+  "swallowTrain-03",
+  "swallowTrain-04",
 ]);
 // 頭を傾ける・向きを変えるステップ: 正面基準の矢印がズレるため、画像だけを見せて重ね矢印を省く（顔位置検査で判定）
 export const OVERLAY_SKIP = new Set([
