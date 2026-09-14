@@ -442,6 +442,21 @@ export const STEP_IMAGES = new Set([
   "swallowTrain-02",
   "swallowTrain-03",
   "swallowTrain-04",
+  "swallowTrain-05",
+  "symmetrySmile-01",
+  "symmetrySmile-02",
+  "symmetrySmile-03",
+  "symmetrySmile-04",
+  "symmetrySmile-05",
+  "templeCircle-01",
+  "templeCircle-02",
+  "templeCircle-03",
+  "templeRelease-01",
+  "templeRelease-02",
+  "templeRelease-03",
+  "tongueDownPress-01",
+  "tongueDownPress-02",
+  "tongueDownPress-03",
 ]);
 // 頭を傾ける・向きを変えるステップ: 正面基準の矢印がズレるため、画像だけを見せて重ね矢印を省く（顔位置検査で判定）
 export const OVERLAY_SKIP = new Set([
