@@ -2286,3 +2286,180 @@ body{
   .focus{ grid-template-columns: 46px 1fr; gap: 4px 14px; }
   .focus-rank{ font-size: 26px; }
 }
+
+/* ===================================================================
+   PRE-ANALYSIS REDESIGN (v6.14)
+   解析前も「説明文で伝える」から「写真と余白で伝える」へ。
+   ヒーローは写実イラスト、入力は 01→02→03 の3ステップに整理する。
+   スマホ優先（1カラム・タップ領域は44px以上）。
+   =================================================================== */
+
+/* ---------- HERO ---------- */
+.hero{ padding: 44px 20px 0; max-width: 1080px; margin: 0 auto; }
+.hero-inner{
+  display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
+}
+.hero-eyebrow{
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Inter', sans-serif; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .22em; color: var(--brand); text-transform: uppercase; margin-bottom: 20px;
+  /* 旧デザインの白いピルを打ち消す */
+  background: none; border: none; box-shadow: none; padding: 0; border-radius: 0;
+}
+.he-line{ width: 28px; height: 1px; background: var(--brand); opacity: .55; }
+.hero h1{
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: clamp(32px, 5.4vw, 52px); font-weight: 900; line-height: 1.32;
+  color: var(--ink); margin: 0 0 18px; letter-spacing: -.01em;
+}
+.hero-lead{ font-size: 15px; color: var(--ink-2); line-height: 1.9; margin: 0 0 30px; }
+.hero-cta{
+  display: inline-flex; align-items: center; gap: 9px;
+  background: linear-gradient(135deg, var(--brand), #F0B7A4); color: #fff;
+  font-size: 15px; font-weight: 700; text-decoration: none;
+  padding: 16px 34px; border-radius: 999px; min-height: 48px;
+  box-shadow: 0 10px 26px rgba(224,122,138,.30);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.hero-cta:hover{ transform: translateY(-2px); box-shadow: 0 16px 34px rgba(224,122,138,.36); }
+
+.hero-visual{ position: relative; display: grid; place-items: center; height: auto; }
+.hero-blob{
+  position: absolute; width: 96%; aspect-ratio: 1/1; border-radius: 50%;
+  background: radial-gradient(circle at 42% 34%, #FFE7EE, #FFD4DF 58%, #FFE9EF);
+  filter: blur(2px); opacity: .85;
+}
+.hero-portrait{
+  position: relative; width: 82%; max-width: 360px; aspect-ratio: 1/1;
+  object-fit: cover; border-radius: 50%; display: block;
+  box-shadow: 0 24px 60px rgba(224,122,138,.28);
+}
+.hero-visual.no-img .hero-portrait{ display: none; }
+/* 解析で見るポイントを、説明文ではなく写真まわりのチップで示す */
+.hero-chip{
+  position: absolute; z-index: 2;
+  background: #fff; color: var(--brand); font-size: 11.5px; font-weight: 700;
+  padding: 7px 15px; border-radius: 999px;
+  box-shadow: 0 8px 20px rgba(224,122,138,.20);
+  animation: heroFloat 5s ease-in-out infinite;
+}
+.hero-chip-1{ top: 12%; left: -2%; }
+.hero-chip-2{ top: 46%; right: -3%; animation-delay: .9s; }
+.hero-chip-3{ bottom: 15%; left: 2%; animation-delay: 1.8s; }
+@keyframes heroFloat{ 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-7px) } }
+@media (prefers-reduced-motion: reduce){ .hero-chip{ animation: none } }
+.hero-script{
+  position: absolute; bottom: -26px; right: auto; font-family: 'Great Vibes', cursive;
+  font-size: 24px; color: var(--brand); opacity: .85;
+}
+.hero-stats{
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  max-width: 1080px; margin: 56px auto 0; padding: 26px 0;
+  border-top: 1px solid rgba(224,122,138,.16);
+  border-bottom: 1px solid rgba(224,122,138,.16);
+  /* 旧デザインの白いカードを打ち消す */
+  background: none; border-left: none; border-right: none; border-radius: 0; box-shadow: none;
+}
+.hero-stats > div{ text-align: center; display: block; background: none; padding: 0; }
+.hero-stats strong{
+  display: block; font-family: 'Inter', sans-serif; font-weight: 700;
+  font-size: clamp(22px, 3.4vw, 30px); color: var(--ink); line-height: 1.2;
+}
+.hero-stats span{ font-size: 10.5px; color: var(--muted); letter-spacing: .04em; }
+
+/* ---------- UPLOAD: 3ステップ ---------- */
+.upload-section{ max-width: 1080px; margin: 0 auto; padding: 0 20px 100px; display: block; }
+.up-step{ padding: 64px 0; border-top: 1px solid rgba(224,122,138,.16); }
+.up-step:first-of-type{ border-top: none; }
+.up-eyebrow{
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Inter', sans-serif; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .22em; color: var(--brand); text-transform: uppercase; margin-bottom: 14px;
+}
+.up-num{
+  font-size: 11px; font-weight: 700; color: #fff; background: var(--brand);
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  letter-spacing: 0;
+}
+.up-title{
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: clamp(23px, 4vw, 32px); font-weight: 700; line-height: 1.45;
+  color: var(--ink); margin: 0 0 8px;
+}
+.up-hint{ font-size: 13px; color: var(--muted); line-height: 1.85; margin: 0 0 22px; }
+.up-hint strong{ color: var(--brand); }
+.up-title + .symptom-chips, .up-title + .hear-grid{ margin-top: 26px; }
+
+/* 写真を選ぶ */
+.upload-drop{
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  min-height: 230px; padding: 34px 20px; cursor: pointer;
+  background: linear-gradient(165deg, #FFF7F9, #FFFFFF);
+  border: 1.5px dashed rgba(224,122,138,.40); border-radius: 22px;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+.upload-drop:hover, .upload-drop.is-over{
+  border-color: var(--brand); background: #FFF3F6; transform: translateY(-2px);
+}
+.drop-ring{
+  width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center;
+  background: #fff; color: var(--brand);
+  box-shadow: 0 8px 22px rgba(224,122,138,.20);
+}
+.drop-title{ font-size: 16px; font-weight: 700; color: var(--ink); }
+.drop-sub{ font-size: 12.5px; color: var(--muted); }
+
+.shot-tips{
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  list-style: none; margin: 18px 0 0; padding: 0;
+}
+.shot-tips li{
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  font-size: 11.5px; font-weight: 600; color: var(--ink-2); text-align: center;
+  background: #fff; border: 1px solid rgba(224,122,138,.14);
+  border-radius: 14px; padding: 14px 8px;
+}
+.st-ico{ font-size: 19px; line-height: 1; }
+
+/* お悩みチップ・ヒアリングはタップしやすさを優先 */
+.upload-section .chip{ min-height: 44px; }
+.upload-section .radio-chips label, .upload-section .check-chips label{ min-height: 40px; }
+.hear-adv{ margin-top: 16px; }
+.profile-note-d > summary{
+  cursor: pointer; list-style: none; font-size: 11.5px; color: var(--muted);
+  padding: 6px 0;
+}
+.profile-note-d > summary::-webkit-details-marker{ display: none; }
+.profile-note-d > summary::before{ content: '＋ '; color: var(--brand); }
+.profile-note-d[open] > summary::before{ content: '− '; }
+
+.upload-section .actions{
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding-top: 40px; border-top: 1px solid rgba(224,122,138,.16);
+}
+.upload-section .btn-primary{ min-width: 260px; min-height: 54px; font-size: 16px; }
+
+/* ---------- スマホ（最優先） ---------- */
+@media (max-width: 860px){
+  .hero{ padding: 26px 18px 0; }
+  .hero-inner{ grid-template-columns: 1fr; gap: 30px; text-align: center; }
+  .hero-eyebrow{ justify-content: center; }
+  .hero-text{ order: 2; }
+  .hero-visual{ order: 1; }
+  .hero-portrait{ width: 72%; max-width: 280px; }
+  .hero-chip{ font-size: 10.5px; padding: 6px 12px; }
+  .hero-chip-1{ left: 2%; } .hero-chip-2{ right: 1%; } .hero-chip-3{ left: 6%; }
+  .hero-script{ position: static; margin-top: 16px; font-size: 21px; }
+  .hero-cta{ width: 100%; max-width: 320px; justify-content: center; }
+  .hero-stats{ grid-template-columns: repeat(2, 1fr); gap: 20px 10px; margin-top: 40px; }
+
+  .upload-section{ padding: 0 18px 90px; }
+  .up-step{ padding: 46px 0; }
+  .upload-drop{ min-height: 200px; border-radius: 18px; }
+  .shot-tips{ grid-template-columns: repeat(2, 1fr); }
+  .upload-section .btn-primary{ width: 100%; max-width: 340px; }
+}
+@media (max-width: 420px){
+  .hero h1{ font-size: 29px; }
+  .hero-chip-2{ right: -1%; }
+}
