@@ -2463,3 +2463,49 @@ body{
   .hero h1{ font-size: 29px; }
   .hero-chip-2{ right: -1%; }
 }
+
+/* ===================================================================
+   MOBILE FIX (v6.14.1)
+   スマホ実機での崩れを2点修正:
+     ① ヒーローのピンク円が器からはみ出し、下の文字に重なっていた
+     ② お悩みチップの ☆ が上の行のチップに重なっていた（行間が8pxしかなかった）
+   =================================================================== */
+
+/* ① ヒーロー: 器を正方形にして、円をその中に収める（はみ出さない） */
+.hero-visual{
+  width: 100%; max-width: 460px; margin: 0 auto;
+  aspect-ratio: 1 / 1;
+  display: grid; place-items: center; position: relative;
+}
+.hero-blob{
+  position: absolute; inset: 0; width: auto; height: auto;
+  border-radius: 50%;
+}
+.hero-portrait{
+  width: 64%; max-width: none;
+}
+.hero-script{
+  position: absolute; left: 50%; right: auto; bottom: 1%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* ② お悩みチップ: ☆ がはみ出す分（上8px）を行間で確保する */
+.symptom-chips .chip-group{
+  row-gap: 22px; column-gap: 10px;
+  padding-top: 6px;
+}
+
+@media (max-width: 860px){
+  .hero-visual{ max-width: 340px; }
+  .hero-portrait{ width: 66%; }
+  .hero-script{ position: absolute; bottom: 0; font-size: 20px; margin-top: 0; }
+  /* 円の下端と見出しが近すぎないよう、余白を足す */
+  .hero-inner{ gap: 22px; }
+  .hero-text{ padding-top: 4px; }
+  .symptom-chips .chip-group{ row-gap: 20px; }
+}
+@media (max-width: 420px){
+  .hero-visual{ max-width: 300px; }
+  .hero-script{ font-size: 18px; }
+}
