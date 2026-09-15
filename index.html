@@ -470,158 +470,108 @@
 <!-- ============ RESULTS ============ -->
 <main id="results" hidden>
 
-  <!-- ===== SUMMARY ===== -->
-  <section class="card">
-    <div class="card-head">
-      <div class="card-num">STEP<br/>02</div>
-      <div>
-        <h2>あなたの顔サマリー <span class="head-deco">✨</span></h2>
-        <p class="muted">AIによる解析結果からスコアと顔タイプを表示します</p>
-      </div>
-    </div>
+  <!-- ===== 01 あなたの顔タイプ ＋ 顔解析オーバーレイ ===== -->
+  <section class="rs rs-hero">
+    <div class="rs-eyebrow"><span class="rs-line"></span>YOUR FACE TYPE</div>
 
-    <div class="summary-grid">
-      <div class="score-wrap">
-        <div class="score-ring" id="score-ring">
-          <svg viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r="52" fill="none" stroke="#FFE5EC" stroke-width="10"/>
-            <circle cx="60" cy="60" r="52" fill="none" stroke="url(#gscore)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" id="score-arc" transform="rotate(-90 60 60)"/>
-            <defs>
-              <linearGradient id="gscore" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#FF8FA8"/>
-                <stop offset="100%" stop-color="#FFC9D6"/>
-              </linearGradient>
-            </defs>
-          </svg>
-          <div class="score-num"><span id="score-value">--</span><small>/100</small></div>
-        </div>
-        <div class="score-label">
-          <div class="score-grade" id="score-grade">--</div>
-          <div class="score-desc" id="score-desc">解析中…</div>
-        </div>
-      </div>
+    <div class="hero-split">
+      <!-- 顔解析オーバーレイ -->
+      <figure class="fa-overlay" id="overlay-grid">
+        <canvas id="overlay-face"></canvas>
+        <figcaption class="fa-legend">
+          <span><i class="lg lg-axis"></i>中心軸</span>
+          <span><i class="lg lg-level"></i>水平</span>
+          <span><i class="lg lg-diff"></i>左右差</span>
+          <span><i class="lg lg-naso"></i>ほうれい線</span>
+        </figcaption>
+      </figure>
 
-      <div class="type-card">
-        <div class="type-eyebrow">あなたの顔タイプ</div>
-        <div class="type-name" id="face-type">--</div>
-        <div class="type-desc" id="face-type-desc">--</div>
+      <!-- タイプ -->
+      <div class="type-block">
+        <p class="type-lead">あなたの顔は</p>
+        <h2 class="type-name" id="face-type">--</h2>
+        <p class="type-desc" id="face-type-desc">--</p>
         <div class="type-tags" id="face-type-tags"></div>
-      </div>
 
-      <div class="metrics" id="metrics-list"></div>
+        <div class="score-row">
+          <div class="score-ring" id="score-ring">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="#FFE9EF" stroke-width="9"/>
+              <circle cx="60" cy="60" r="52" fill="none" stroke="url(#gscore)" stroke-width="9" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" id="score-arc" transform="rotate(-90 60 60)"/>
+              <defs>
+                <linearGradient id="gscore" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#FF8FA8"/>
+                  <stop offset="100%" stop-color="#F0B7A4"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="score-num"><span id="score-value">--</span></div>
+          </div>
+          <div class="score-side">
+            <div class="score-grade" id="score-grade">--</div>
+            <div class="score-cap">今のコンディション</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="analysis-warnings" class="analysis-warnings" hidden></div>
-    <div id="side-scores" class="side-scores" hidden></div>
-
-    <div class="overlay-grid">
-      <div class="overlay-pane">
-        <div class="pane-title">顔解析オーバーレイ</div>
-        <canvas id="overlay-face"></canvas>
-        <div class="legend">
-          <span><i style="background:#FF8FA8"></i>中心軸</span>
-          <span><i style="background:#A8D8B9"></i>水平基準</span>
-          <span><i style="background:#FFC966"></i>左右差</span>
-          <span><i style="background:#FFB7C5"></i>ほうれい線</span>
-        </div>
-      </div>
-    </div>
   </section>
 
-  <!-- ===== PROBLEMS ===== -->
-  <section class="card">
-    <div class="card-head">
-      <div class="card-num">STEP<br/>03</div>
-      <div>
-        <h2>気になる顔のポイント <span class="head-deco">💗</span></h2>
-        <p class="muted">写真から見えた特徴と、あなたのお悩みを照らし合わせて整理します</p>
-      </div>
-    </div>
-    <div id="symptom-summary" class="symptom-summary" hidden></div>
-    <div class="problems-list" id="problems-list"></div>
-    <div class="prescription-link" id="prescription-link" hidden></div>
+  <!-- ===== 02 改善の優先順位 ===== -->
+  <section class="rs rs-focus">
+    <div class="rs-eyebrow"><span class="rs-line"></span>PRIORITY</div>
+    <h2 class="rs-title">いま効く順に、３つだけ。</h2>
+    <div class="focus-list" id="problems-list"></div>
   </section>
 
-  <!-- ===== KNOWLEDGE ===== -->
-  <section class="card knowledge-card">
-    <div class="card-head">
-      <div class="card-num">STEP<br/>04</div>
-      <div>
-        <h2>顔の豆知識 <span class="head-deco">🌸</span></h2>
-        <p class="muted">あなたの顔を理解するための、知っておきたい知識</p>
-      </div>
-    </div>
-    <div class="knowledge-grid" id="knowledge-grid"></div>
-  </section>
+  <!-- ===== 03 30日間プログラム（今日＋全体） ===== -->
+  <section class="rs rs-program">
+    <div class="rs-eyebrow"><span class="rs-line"></span>30 DAY PROGRAM</div>
+    <h2 class="rs-title">あなた専用の、30日。</h2>
 
-  <!-- ===== TODAY ===== -->
-  <section class="card today-card">
-    <div class="card-head">
-      <div class="card-num">STEP<br/>05</div>
-      <div>
-        <h2>今日のあなた専用メニュー <span class="head-deco">🎀</span></h2>
-        <p class="muted">時間配分・優先度・ゴール・生活習慣すべてを反映したオーダーメイド構成</p>
-      </div>
-    </div>
     <div class="journey-bar" id="journey-bar" hidden></div>
-    <div class="install-promo" id="install-promo" hidden></div>
-    <div class="today-summary" id="today-summary" hidden></div>
-    <div class="reason-box" id="today-reason"></div>
-    <button class="today-flow-btn" id="btn-today-flow" type="button" hidden>
-      ▶ 今日のトレーニングを順番に始める
-      <small>次へを押すだけで、今日の全種目を迷わず完走できます</small>
-    </button>
-    <div class="today-grid" id="today-grid"></div>
-  </section>
 
-  <!-- ===== 30 DAYS ===== -->
-  <section class="card program-card">
-    <div class="card-head">
-      <div class="card-num">STEP<br/>06</div>
-      <div>
-        <h2>30日間 美顔トレーニングプログラム <span class="head-deco">👑</span></h2>
-        <p class="muted">Phase 1: 覚醒（Day1-10）／ Phase 2: 強化（Day11-20）／ Phase 3: 定着（Day21-30）</p>
+    <div class="today-block">
+      <div class="today-head">
+        <span class="today-badge">TODAY</span>
+        <div class="today-summary" id="today-summary" hidden></div>
       </div>
+      <button class="today-flow-btn" id="btn-today-flow" type="button" hidden>
+        今日のトレーニングを始める
+        <small>次へを押すだけで完走できます</small>
+      </button>
+      <div class="today-grid" id="today-grid"></div>
+      <details class="rs-more">
+        <summary>なぜ今日このメニュー？</summary>
+        <div class="reason-box" id="today-reason"></div>
+      </details>
     </div>
+
     <div class="phase-tabs" id="phase-tabs">
       <button class="phase-tab active" data-phase="1">Phase 1<small>覚醒 Day1-10</small></button>
       <button class="phase-tab" data-phase="2">Phase 2<small>強化 Day11-20</small></button>
       <button class="phase-tab" data-phase="3">Phase 3<small>定着 Day21-30</small></button>
     </div>
-    <div class="program-meta" id="program-meta"></div>
     <div class="program-grid" id="program-grid"></div>
-
-    <div class="actions" style="justify-content:flex-end; margin-top:24px;">
-      <button class="btn-ghost" id="btn-print">🖨️ プログラムを印刷</button>
-      <button class="btn-primary" id="btn-restart">
-        <span class="btn-label">もう一度解析する</span>
-      </button>
-    </div>
+    <details class="rs-more"><summary>プログラムの設計方針</summary><div id="program-meta"></div></details>
   </section>
 
-  <!-- ===== PROGRESS TRACKER ===== -->
-  <section class="card progress-card">
-    <div class="card-head">
-      <div class="card-num">STEP<br/>07</div>
-      <div>
-        <h2>あなたの変化を見守る <span class="head-deco">📈</span></h2>
-        <p class="muted">解析するたびにこの端末に履歴を保存。Before/After のスライダーで変化を比較できます。</p>
-      </div>
+  <!-- ===== 04 変化（スコア推移 ＋ Before/After） ===== -->
+  <section class="rs rs-change">
+    <div class="rs-eyebrow"><span class="rs-line"></span>YOUR CHANGE</div>
+    <h2 class="rs-title">変化は、数字より顔に出る。</h2>
+
+    <div class="change-actions">
+      <button class="btn-compare" id="btn-compare" disabled>Before / After を見る</button>
+      <span class="change-stat" id="progress-stat"></span>
     </div>
-    <div class="progress-bar-row">
-      <div class="progress-stat" id="progress-stat">履歴: 0件</div>
-      <div class="progress-actions">
-        <button class="btn-progress" id="btn-compare" disabled>📊 Before/After を比較</button>
-        <button class="btn-progress ghost" id="btn-clear-history">🗑️ 履歴を消去</button>
-      </div>
-    </div>
+
     <div class="progress-empty" id="progress-empty" hidden>
-      <p>まだ履歴がありません。週に1回、同じ条件で撮影して比較しましょう。</p>
+      <p>週に1回、同じ場所・同じ明るさで撮ると、変化がはっきり見えます。</p>
     </div>
     <div class="score-trend" id="score-trend" hidden></div>
-    <div class="progress-timeline" id="progress-timeline"></div>
-    <!-- ba-stage は正方形+overflow:hidden の「写真の比較窓」。
-         解析テキスト(ba-meta)を中に置くと窓からはみ出して切れるため、外に出す -->
+
     <div class="ba-wrap" id="ba-stage" hidden>
       <div class="ba-stage">
         <img class="ba-img ba-before" id="ba-before" alt="Before"/>
@@ -631,6 +581,13 @@
         <input type="range" min="0" max="100" value="50" class="ba-slider" id="ba-slider"/>
       </div>
       <div class="ba-meta" id="ba-meta"></div>
+    </div>
+
+    <div class="progress-timeline" id="progress-timeline"></div>
+
+    <div class="rs-footer-actions">
+      <button class="btn-primary" id="btn-restart"><span class="btn-label">もう一度解析する</span></button>
+      <button class="btn-quiet" id="btn-clear-history">履歴を消去</button>
     </div>
   </section>
 </main>

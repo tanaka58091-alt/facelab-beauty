@@ -2002,3 +2002,287 @@ body{
   font-size:10.5px; font-weight:700; vertical-align:middle;
 }
 .exercise-card.is-core{ border-color:#F5D98B; box-shadow:0 3px 12px rgba(255,193,60,.18); }
+
+/* ===================================================================
+   RESULTS REDESIGN (v6.13)
+   解析後は「顔タイプ / 顔解析オーバーレイ / 改善の優先順位 /
+   30日プログラム / 変化」の5つだけ。文字ではなく、余白・大きさ・
+   写真で伝える構成にする（ターゲットが女性のため、雑誌のような静けさ）。
+   =================================================================== */
+#results{
+  max-width: 1080px; margin: 0 auto; padding: 0 20px 80px;
+  display: flex; flex-direction: column; gap: 0;
+}
+.rs{
+  padding: 72px 0;
+  border-top: 1px solid rgba(224,122,138,.16);
+}
+.rs:first-child{ border-top: none; padding-top: 40px; }
+
+/* 見出し（英字の細いラベル＋余白で「章」を示す。説明文は置かない） */
+.rs-eyebrow{
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Inter', sans-serif; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .22em; color: var(--brand); text-transform: uppercase;
+  margin-bottom: 18px;
+}
+.rs-line{ width: 28px; height: 1px; background: var(--brand); opacity: .55; }
+.rs-title{
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: clamp(24px, 4.2vw, 34px); font-weight: 700; line-height: 1.45;
+  color: var(--ink); margin: 0 0 32px; letter-spacing: .01em;
+}
+
+/* 詳細は「読みたい人だけ」開く（初期状態は畳んで文字量を出さない） */
+.rs-more{ margin-top: 20px; }
+.rs-more > summary{
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  padding: 7px 2px; transition: color .15s ease;
+}
+.rs-more > summary::-webkit-details-marker{ display: none; }
+.rs-more > summary::before{ content: '＋'; font-size: 11px; color: var(--brand); }
+.rs-more[open] > summary::before{ content: '−'; }
+.rs-more > summary:hover{ color: var(--brand); }
+
+/* ---------- 01 HERO: オーバーレイ ＋ 顔タイプ ---------- */
+.hero-split{
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px; align-items: center;
+}
+.fa-overlay{ margin: 0; }
+.fa-overlay canvas{
+  display: block; width: 100%; height: auto;
+  border-radius: 20px; background: var(--bg-2);
+  box-shadow: 0 18px 46px rgba(224,122,138,.18);
+}
+.fa-legend{
+  display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
+  margin-top: 16px; font-size: 11px; color: var(--muted);
+}
+.fa-legend span{ display: inline-flex; align-items: center; gap: 6px; }
+.fa-legend .lg{ width: 14px; height: 2px; border-radius: 2px; display: inline-block; }
+.lg-axis{ background: #E07A8A; } .lg-level{ background: #A8D8B9; }
+.lg-diff{ background: #FFC966; } .lg-naso{ background: #FFB7C5; }
+
+.type-lead{ font-size: 13px; color: var(--muted); margin: 0 0 6px; letter-spacing: .06em; }
+.type-name{
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: clamp(30px, 5.6vw, 46px); font-weight: 900; line-height: 1.28;
+  color: var(--ink); margin: 0 0 16px; letter-spacing: -.01em;
+}
+.type-desc{ font-size: 14.5px; line-height: 1.95; color: var(--ink-2); margin: 0 0 18px; }
+.type-tags{ display: flex; flex-wrap: wrap; gap: 8px; }
+.type-tags span{
+  font-size: 11.5px; font-weight: 700; color: var(--brand);
+  background: var(--brand-soft); border-radius: 999px; padding: 6px 14px;
+}
+
+/* スコアは主役ではなく「今の位置」を示す小さな指標 */
+.score-row{
+  display: flex; align-items: center; gap: 18px;
+  margin-top: 30px; padding-top: 26px;
+  border-top: 1px solid rgba(224,122,138,.16);
+}
+.score-row .score-ring{ position: relative; width: 84px; height: 84px; flex-shrink: 0; }
+.score-row .score-ring svg{ width: 100%; height: 100%; display: block; }
+.score-row .score-num{
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: 'Inter', sans-serif; font-weight: 800; font-size: 25px; color: var(--ink);
+}
+.score-grade{
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: 19px; font-weight: 700; color: var(--brand); line-height: 1.4;
+}
+.score-cap{ font-size: 11.5px; color: var(--muted); margin-top: 3px; letter-spacing: .06em; }
+
+/* ---------- 02 PRIORITY ---------- */
+/* 順位・テーマ名・優先度バーの3点だけで「どこから手を付けるか」を伝える */
+.focus-list{ display: flex; flex-direction: column; }
+.focus{
+  display: grid; grid-template-columns: 62px 1fr; gap: 6px 20px; align-items: baseline;
+  padding: 28px 0; border-top: 1px solid rgba(224,122,138,.14);
+}
+.focus:first-child{ border-top: none; padding-top: 6px; }
+.focus-rank{
+  font-family: 'Inter', sans-serif; font-size: 34px; font-weight: 200;
+  color: var(--brand); opacity: .42; line-height: 1; letter-spacing: -.02em;
+}
+.focus.sev-high .focus-rank{ opacity: .9; font-weight: 300; }
+.focus-main{ min-width: 0; }
+.focus-title{
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: clamp(20px, 2.6vw, 25px); font-weight: 700; color: var(--ink);
+  margin: 0 0 16px; line-height: 1.45;
+}
+.focus-bar{
+  height: 5px; border-radius: 999px; background: #FBE7EC; overflow: hidden;
+  max-width: 460px; position: relative;
+}
+.focus-bar > i{
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #FF8FA8, #F0B7A4);
+}
+.focus.sev-low .focus-bar > i{ background: #F2CBD5; }
+.focus-sev{
+  font-size: 11px; color: var(--muted); margin-top: 10px;
+  letter-spacing: .12em; text-transform: none;
+}
+.focus-more{ margin-top: 14px; }
+.focus-more > summary{
+  cursor: pointer; list-style: none; font-size: 12px; font-weight: 600;
+  color: var(--brand); display: inline-flex; align-items: center; gap: 5px;
+}
+.focus-more > summary::-webkit-details-marker{ display: none; }
+.focus-more > summary::after{ content: '›'; font-size: 14px; }
+.focus-more[open] > summary::after{ transform: rotate(90deg); }
+.focus-desc{ font-size: 13.5px; line-height: 1.95; color: var(--ink-2); margin: 12px 0 8px; }
+.focus-metric{ font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+.focus-tissue{ display: flex; flex-direction: column; gap: 12px; font-size: 12.5px; color: var(--ink-2); }
+.ft-row{ display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.focus-tissue .tt{
+  flex-shrink: 0; min-width: 62px; margin-top: 2px;
+  font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; text-align: center;
+}
+.ft-chips{ display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+/* 平易な名前を主、専門名を従にして1チップにまとめる（縦に崩れないように） */
+.ft-chip{
+  display: inline-flex; align-items: baseline; gap: 5px;
+  background: #FCF6F8; border: 1px solid rgba(224,122,138,.14);
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; color: var(--ink-2);
+}
+.ft-chip .tissue-tech{ font-size: 10px; color: var(--muted); }
+.tt-soft{ background: #FFF0F4; color: #E07A8A; }
+.tt-move{ background: #ECF7F0; color: #2E9E5B; }
+.focus-note{ font-size: 11px; color: var(--muted); line-height: 1.8; margin: 12px 0 0; }
+
+/* ---------- 03 30 DAY PROGRAM ---------- */
+.today-block{
+  background: linear-gradient(160deg, #FFF7F9, #FFFFFF);
+  border: 1px solid rgba(224,122,138,.18); border-radius: 22px;
+  padding: 30px; margin-bottom: 40px;
+  box-shadow: 0 14px 38px rgba(224,122,138,.10);
+}
+.today-head{ display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.today-badge{
+  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .18em;
+  color: #fff; background: var(--brand); border-radius: 999px; padding: 5px 13px;
+}
+.rs-program .today-summary{ margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.rs-program .today-flow-btn{ width: 100%; margin: 0 0 22px; }
+.rs-program .reason-box{ margin-top: 10px; }
+
+/* 今日のメニュー: 写真が主役のタイル。文字は名前と所要時間だけ */
+.rs-program .today-grid{
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px;
+}
+.ex-tile{ cursor: pointer; }
+.ex-tile-img{
+  position: relative; aspect-ratio: 1 / 1; border-radius: 16px; overflow: hidden;
+  background: #FFF5F7; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(224,122,138,.12);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.ex-tile:hover .ex-tile-img{ transform: translateY(-3px); box-shadow: 0 14px 30px rgba(224,122,138,.22); }
+.ex-tile-img > img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.ex-tile-img:not(.no-img) > svg{ display: none; }
+.ex-tile-img.no-img > svg{ width: 70%; height: auto; }
+.ex-tile-core{
+  position: absolute; left: 8px; top: 8px;
+  font-size: 9.5px; font-weight: 700; color: #8A6300;
+  background: rgba(255,228,150,.95); border-radius: 999px; padding: 3px 9px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.08);
+}
+.ex-tile.is-core .ex-tile-img{ box-shadow: 0 6px 18px rgba(240,183,60,.26); }
+.ex-tile-name{
+  font-size: 13px; font-weight: 700; color: var(--ink);
+  margin-top: 10px; line-height: 1.5;
+}
+.ex-tile-time{ font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ---------- 04 CHANGE ---------- */
+.change-actions{ display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+.btn-compare{
+  font-family: inherit; font-size: 13.5px; font-weight: 700; color: #fff; cursor: pointer;
+  background: linear-gradient(135deg, var(--brand), #F0B7A4);
+  border: none; border-radius: 999px; padding: 13px 28px;
+  box-shadow: 0 8px 22px rgba(224,122,138,.3); transition: transform .15s ease, box-shadow .15s ease;
+}
+.btn-compare:hover:not(:disabled){ transform: translateY(-1px); box-shadow: 0 12px 28px rgba(224,122,138,.36); }
+.btn-compare:disabled{ background: #F3E6EA; color: #C4A9B1; box-shadow: none; cursor: default; }
+.change-stat{ font-size: 12px; color: var(--muted); letter-spacing: .05em; }
+.rs-change .progress-empty{ font-size: 13px; color: var(--muted); line-height: 1.9; }
+.rs-footer-actions{
+  display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap;
+  margin-top: 52px; padding-top: 32px; border-top: 1px solid rgba(224,122,138,.16);
+}
+.btn-quiet{
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  font-size: 12px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px;
+}
+.btn-quiet:hover{ color: var(--bad); }
+
+@media (max-width: 860px){
+  #results{ padding: 0 16px 60px; }
+  .rs{ padding: 52px 0; }
+  .hero-split{ grid-template-columns: 1fr; gap: 30px; }
+  .focus{ grid-template-columns: auto 1fr; gap: 16px; }
+  .focus-ill{ display: none; }
+  .today-block{ padding: 22px; border-radius: 18px; }
+  .rs-footer-actions{ margin-top: 36px; }
+}
+
+/* ---------- 仕上げ: 履歴カード・今日のボタン・ジャーニーバー ---------- */
+/* 削除ボタンにスタイルが無く、カードの下に素のボタンが出ていたので、
+   サムネ右上の控えめなアイコンにする */
+.rs-change .progress-timeline{ margin-top: 26px; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
+.rs-change .progress-item{
+  position: relative; border-radius: 16px; border-color: rgba(224,122,138,.18);
+  box-shadow: 0 8px 22px rgba(224,122,138,.10);
+}
+.rs-change .progress-item:hover{ transform: translateY(-3px); box-shadow: 0 14px 30px rgba(224,122,138,.18); }
+.progress-del{
+  position: absolute; top: 8px; right: 8px; width: 24px; height: 24px;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(255,255,255,.88); color: var(--muted);
+  font-size: 13px; line-height: 1; display: grid; place-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.10); opacity: 0; transition: opacity .15s ease, color .15s ease;
+}
+.progress-item:hover .progress-del, .progress-del:focus-visible{ opacity: 1; }
+.progress-del:hover{ color: var(--bad); }
+.rs-change .progress-meta{ padding: 12px 13px 14px; }
+.rs-change .progress-score{ font-family: 'Inter', sans-serif; font-weight: 700; font-size: 20px; color: var(--ink); }
+.rs-change .progress-grade{ font-family: inherit; font-size: 12px; font-weight: 700; color: var(--brand); }
+.progress-badge.latest{
+  font-size: 9.5px; font-weight: 700; color: #fff; background: var(--brand);
+  border-radius: 999px; padding: 2px 8px; margin-left: 2px;
+}
+
+/* 今日のボタン・ジャーニーバーは面が重かったので、線と余白で軽くする */
+.rs-program .journey-bar{
+  background: #fff; border: 1px solid rgba(224,122,138,.20);
+  border-radius: 18px; box-shadow: none; margin-bottom: 22px;
+}
+.rs-program .today-flow-btn{
+  background: linear-gradient(135deg, var(--brand), #F0B7A4);
+  border: none; border-radius: 999px; color: #fff;
+  padding: 16px 20px; font-size: 15px; font-weight: 700;
+  box-shadow: 0 10px 26px rgba(224,122,138,.28);
+}
+.rs-program .today-flow-btn small{
+  display: block; font-size: 11px; font-weight: 500; opacity: .9; margin-top: 3px;
+}
+.rs-program .today-flow-btn:hover{ transform: translateY(-1px); box-shadow: 0 14px 32px rgba(224,122,138,.34); }
+
+/* 30日グリッドのカードも角と影をそろえる */
+.rs-program .program-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.rs-program .day-card{ border-radius: 16px; border-color: rgba(224,122,138,.16); }
+.rs-program .phase-tabs{ margin-bottom: 20px; }
+
+@media (max-width: 860px){
+  .rs-program .today-grid{ grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 12px; }
+  .rs-change .progress-timeline{ grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); }
+  .progress-del{ opacity: 1; }   /* スマホはホバーが無いので常時表示 */
+  .focus{ grid-template-columns: 46px 1fr; gap: 4px 14px; }
+  .focus-rank{ font-size: 26px; }
+}

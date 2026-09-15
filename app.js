@@ -695,15 +695,13 @@ els.btnAnalyze.addEventListener('click', async () => {
 // ===================================================================
 // RENDER
 // ===================================================================
+// 解析後ページは「顔タイプ / 顔解析オーバーレイ / 改善の優先順位 / 30日プログラム /
+// 変化(スコア推移・Before After)」の5つだけを見せる構成。
+// 指標一覧・左右独立スコア・豆知識・お悩み照合の詳細表示は、文字量を減らすため撤去した。
 function renderAll(){
   renderScoreAndType();
-  renderMetrics();
   renderOverlay();
-  renderSymptomSummary();
-  renderSideScores();
   renderProblems();
-  renderPrescriptionLink();
-  renderKnowledge();
   renderToday();
   renderProgramMeta();
   renderProgram(state.currentPhase);
@@ -903,7 +901,7 @@ const METRIC_LABEL = Object.fromEntries(KEY_METRICS.map(m => [m.key, m.label]));
 const METRIC_DIR   = Object.fromEntries(KEY_METRICS.map(m => [m.key, m.dir]));
 function renderProgress(){
   const snaps = listSnapshots();
-  if (els.progressStat) els.progressStat.textContent = `履歴: ${snaps.length}件`;
+  if (els.progressStat) els.progressStat.textContent = snaps.length ? `記録 ${snaps.length}回` : '';
   if (els.btnCompare) els.btnCompare.disabled = snaps.length < 2;
   if (!els.progressTimeline) return;
   if (snaps.length === 0){
@@ -1405,6 +1403,7 @@ function applyUserPrefsToForm(){
 // それとも写真では強く出ていないのかを、はっきり伝える。
 // (写真に出ない＝気のせい、ではない。だから扱いも変えないことを明記する)
 function renderSymptomSummary(){
+  if (!els.symptomSummary) return;   // お悩み照合の詳細は現行デザインでは非表示
   const has = state.symptoms.length > 0 || state.symptomFree;
   if (!has){ els.symptomSummary.hidden = true; return; }
 
@@ -1474,7 +1473,7 @@ function renderScoreAndType(){
   // 他人との比較(上位◯%)は出さない。自分の状態 + 良いところを伝える。
   const strength = bestSideStrength();
   const strengthNote = strength ? ` あなたの強みは「${strength}」。` : '';
-  els.scoreDesc.textContent = desc + strengthNote;
+  if (els.scoreDesc) els.scoreDesc.textContent = desc + strengthNote;
   const circ = 2 * Math.PI * 52;
   els.scoreArc.setAttribute('stroke-dashoffset', circ - (score/100) * circ);
 
@@ -1500,6 +1499,7 @@ function bestSideStrength(){
 }
 
 function renderMetrics(){
+  if (!els.metricsList) return;   // 指標一覧は現行デザインでは非表示
   const items = buildMetricsList(state.result);
   els.metricsList.innerHTML = items.map(it => `
     <div class="metric ${it.sev}">
@@ -1644,39 +1644,44 @@ function glossMuscle(raw){
   return raw;
 }
 
+// 優先順位は「順位・テーマ名・優先度バー」だけを表に出す。
+// 根拠や働きかける場所は、読みたい人だけが開ける形にして文字量を抑える。
 function renderProblems(){
-  els.problemsList.innerHTML = state.problems.map(p => {
-    // 「85」のような測定していない数値は出さない(偽の精度を与えるため)。
-    // 医療的な「重症度」ではなく、取り組む順番の目安として表示する。
-    const sevIcon = p.severity === 'high' ? '◎' : p.severity === 'mid' ? '○' : '・';
-    const sevText = p.severity === 'high' ? '優先度 高' : p.severity === 'mid' ? '優先度 中' : '気になれば';
-    return `
-      <div class="problem sev-${p.severity}">
-        <div class="problem-sev">
-          <strong class="sev-icon">${sevIcon}</strong><span>${sevText}</span>
-        </div>
-        <div class="problem-body">
-          <h3>${p.title}</h3>
-          <div class="problem-meta">
-            <span>写真から: <strong>${p.metric}</strong></span>
-          </div>
-          <div class="problem-desc">${p.description}</div>
-          <div class="tissue-list">
-            <div class="tissue tight">
-              <strong>🌷 このテーマで「ゆるめる」場所</strong>
-              <ul>${p.tissues.tight.map(t=>`<li>${glossMuscle(t)}</li>`).join('') || '<li>—</li>'}</ul>
+  if (!els.problemsList) return;
+  const SEV_W = { high: 100, mid: 68, low: 38 };
+  const SEV_T = { high: '優先度 高', mid: '優先度 中', low: '気になれば' };
+  els.problemsList.innerHTML = state.problems.map((p, i) => `
+      <article class="focus sev-${p.severity}">
+        <div class="focus-rank">${String(i + 1).padStart(2, '0')}</div>
+        <div class="focus-main">
+          <h3 class="focus-title">${p.title}</h3>
+          <div class="focus-bar"><i style="width:${SEV_W[p.severity] || 40}%"></i></div>
+          <div class="focus-sev">${SEV_T[p.severity] || ''}</div>
+          <details class="focus-more">
+            <summary>くわしく</summary>
+            <p class="focus-desc">${p.description}</p>
+            <p class="focus-metric">写真から：<strong>${p.metric}</strong></p>
+            <div class="focus-tissue">
+              <div class="ft-row">
+                <span class="tt tt-soft">ゆるめる</span>
+                <span class="ft-chips">${p.tissues.tight.map(t => `<span class="ft-chip">${glossMuscle(t)}</span>`).join('') || '—'}</span>
+              </div>
+              <div class="ft-row">
+                <span class="tt tt-move">動かす</span>
+                <span class="ft-chips">${p.tissues.weak.map(t => `<span class="ft-chip">${glossMuscle(t)}</span>`).join('') || '—'}</span>
+              </div>
             </div>
-            <div class="tissue weak">
-              <strong>💪 このテーマで「動かす」場所</strong>
-              <ul>${p.tissues.weak.map(t=>`<li>${glossMuscle(t)}</li>`).join('') || '<li>—</li>'}</ul>
-            </div>
-          </div>
-          <p class="tissue-note">※ このテーマのケアが働きかける場所です。写真から筋肉の硬さや強さを測っているわけではありません。</p>
+            <p class="focus-note">※ このテーマのケアが働きかける場所です。写真から筋肉の硬さや強さを測っているわけではありません。</p>
+          </details>
         </div>
-        <div class="problem-side">${problemIllust(p.key)}</div>
-      </div>
-    `;
-  }).join('');
+      </article>
+  `).join('');
+  // 見出しは実際の件数に合わせる（「3つだけ」と書いて2つしか出ない、を防ぐ）
+  const h = document.querySelector('.rs-focus .rs-title');
+  if (h){
+    const n = state.problems.length;
+    h.textContent = n <= 1 ? 'いま効くのは、ここ。' : `いま効く順に、${n}つ。`;
+  }
 }
 
 function problemIllust(key){
@@ -1727,6 +1732,7 @@ function problemIllust(key){
 
 // ===== Knowledge =====
 function renderKnowledge(){
+  if (!els.knowledgeGrid) return;    // 豆知識は現行デザインでは非表示
   const cards = getKnowledgeFor(state.problems.map(p => p.key));
   els.knowledgeGrid.innerHTML = cards.map(c => {
     const kindClass = c.kind ? ` know-${c.kind}` : '';
@@ -1932,25 +1938,24 @@ function renderProgramMeta(){
     <span><strong>優先:</strong>${priText}</span>
   `;
 }
+// 今日のメニューのカード。説明文は載せず、手順イラストと種目名だけで伝える。
+// （詳しい説明はカードを開いたときのモーダルにある）
 function exerciseCard(ex, opts={}){
-  const coreBadge = opts.core ? '<span class="ex-core">まずはこれだけ</span>' : '';
+  const hero = heroImageSrc(ex.id);
   return `
-    <div class="exercise-card${opts.core ? ' is-core' : ''}" data-ex="${ex.id}">
-      <div class="ex-illust${heroImageSrc(ex.id) ? '' : ' no-img'}">${heroImageSrc(ex.id) ? `<img class="ex-illust-img" src="${heroImageSrc(ex.id)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.classList.add('no-img')">` : ''}${ex.illustration}</div>
-      <div class="ex-info">
-        <span class="ex-cat training">トレーニング</span>${coreBadge}
-        <h4>${ex.name}</h4>
-        <div class="ex-meta">
-          <span><strong>⏱</strong> ${ex.duration}</span>
-          <span><strong>🛠</strong> ${ex.equipment}</span>
-        </div>
-        <div class="ex-purpose">${ex.purpose}</div>
+    <div class="ex-tile${opts.core ? ' is-core' : ''}" data-ex="${ex.id}">
+      <div class="ex-tile-img${hero ? '' : ' no-img'}">
+        ${hero ? `<img src="${hero}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.classList.add('no-img')">` : ''}
+        ${ex.illustration}
+        ${opts.core ? '<span class="ex-tile-core">まずはこれだけ</span>' : ''}
       </div>
+      <div class="ex-tile-name">${ex.name}</div>
+      <div class="ex-tile-time">${ex.duration}</div>
     </div>
   `;
 }
 function bindExerciseCards(parent){
-  parent.querySelectorAll('.exercise-card').forEach(card => {
+  parent.querySelectorAll('.exercise-card, .ex-tile').forEach(card => {
     card.addEventListener('click', () => openExerciseModal(EXERCISES[card.dataset.ex]));
   });
 }
@@ -2163,12 +2168,13 @@ function uiAlert({ title, message }){
   });
 }
 
-els.btnRestart.addEventListener('click', () => {
+// 印刷ボタンは現行デザインでは置いていない。要素が無くても落ちないようにする。
+if (els.btnRestart) els.btnRestart.addEventListener('click', () => {
   els.results.hidden = true;
   updateStickyCta();
   document.getElementById('upload-section').scrollIntoView({behavior:'smooth'});
 });
-els.btnPrint.addEventListener('click', () => window.print());
+if (els.btnPrint) els.btnPrint.addEventListener('click', () => window.print());
 
 // ===================================================================
 // PWA — Service Worker登録 & 「ホーム画面に追加」案内
